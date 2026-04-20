@@ -4,7 +4,7 @@
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/web/app.py                                              ║
 ║ Version:     1.0.0                                                           ║
-║ Author:      Bas                                                             ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Flask application factory - creates and configures Flask app    ║
 ║              with all blueprints, authentication, and filters.               ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -24,7 +24,12 @@ def create_app(engine, playlist, scheduler, media_dir, users_path, alert_manager
                 template_folder='templates',
                 static_folder='static')
 
-    app.secret_key = os.environ.get('SIGNAGE_SECRET', 'change-me-xyz789')
+    secret_key = os.environ.get('SIGNAGE_SECRET')
+    if not secret_key:
+        log.error('SIGNAGE_SECRET environment variable not set!')
+        log.error('Generate one with: python3 -c "import secrets; print(secrets.token_hex(32))"')
+        raise RuntimeError('SIGNAGE_SECRET must be set for security. Refusing to start.')
+    app.secret_key = secret_key
     app.config['MAX_CONTENT_LENGTH'] = 512 * 1024 * 1024
     app.config['MEDIA_DIR']    = os.path.abspath(media_dir)
     app.config['USERS_PATH']   = users_path
@@ -81,6 +86,8 @@ def register_error_handlers(app):
         import traceback
         detail = traceback.format_exc()
         log.error(f"500 error: {e}\n{detail}")
+        # Only show traceback in debug mode
+        show_detail = detail if app.debug else None
         return render_template('error.html', code=500,
                                message='Something went wrong on the server.',
-                               detail=detail), 500
+                               detail=show_detail), 500

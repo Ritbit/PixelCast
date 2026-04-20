@@ -4,7 +4,7 @@
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/video.py                                       ║
 ║ Version:     1.0.0                                                           ║
-║ Author:      Bas                                                             ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Video renderer using PyAV - supports MP4, AVI, MOV with        ║
 ║              multiple scaling modes, loop modes (restart/pingpong), start    ║
 ║              offset, and background options. Auto-uses transcoded versions.  ║
@@ -54,6 +54,7 @@ class VideoRenderer(BaseRenderer):
         self._prebuffered   = None
         self._prebuf_ready  = threading.Event()
         self._prebuf_thread = None
+        self._prebuf_stop   = threading.Event()
         self._bg_cache      = None   # cached background PIL image
 
         self._open()
@@ -110,13 +111,16 @@ class VideoRenderer(BaseRenderer):
         import av
         frames = []
         try:
-            tmp    = av.open(self._path)
+            tmp = av.open(self._path)
             self._seek_to_offset(tmp)
-            stream = tmp.streams.video[0]
-            stream.thread_type = 'AUTO'
-            for packet in tmp.demux(stream):
-                for f in packet.decode():
-                    frames.append(self._pil_to_array(f.to_image().convert('RGB')))
+            for packet in tmp.demux(video=0):
+                if self._prebuf_stop.is_set():
+                    break
+                for frame in packet.decode():
+                    if self._prebuf_stop.is_set():
+                        break
+                    pil_img = frame.to_image()
+                    frames.append(self._pil_to_array(pil_img))
             tmp.close()
         except Exception as e:
             log.error(f"Pre-buffer failed: {e}")
@@ -155,7 +159,9 @@ class VideoRenderer(BaseRenderer):
 
     def frames(self):
         if self._container is None and self._prebuffered is None:
-            while True: yield self._black()
+            while True:
+                yield self._black()
+                time.sleep(0.01)
             return
         if self._want_prebuf:
             if self._prebuf_ready.is_set() and self._prebuffered:
@@ -245,8 +251,15 @@ class VideoRenderer(BaseRenderer):
                 return
 
     def close(self):
+        # Signal prebuffer thread to stop
+        if self._prebuf_thread and self._prebuf_thread.is_alive():
+            self._prebuf_stop.set()
+            self._prebuf_thread.join(timeout=2.0)
+            self._prebuf_thread = None
+        
         if self._container:
             try: self._container.close()
             except Exception: pass
             self._container = None
         self._prebuffered = None
+        self._prebuf_stop.clear()

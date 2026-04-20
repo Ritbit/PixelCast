@@ -25,12 +25,7 @@ log = logging.getLogger('web.auth')
 
 ROLE_LEVEL = {'viewer': 0, 'editor': 1, 'admin': 2}
 
-DEFAULT_USERS = {
-    'admin': {
-        'password_hash': hashlib.sha256(b'admin').hexdigest(),
-        'role': 'admin',
-    }
-}
+# No default users - first-run setup required
 
 
 class User(UserMixin):
@@ -54,10 +49,10 @@ def load_users(path: str) -> dict:
         except Exception as e:
             log.error(f'Failed to load users: {e}')
     else:
+        # No users file exists - return empty dict for first-run setup
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        _save_full(path, DEFAULT_USERS)
-        log.info(f'Default users written to {path} (admin/admin)')
-    return DEFAULT_USERS.copy()
+        log.warning(f'No users file found at {path} - first-run setup required')
+    return {}
 
 
 def _load_full(path: str) -> dict:

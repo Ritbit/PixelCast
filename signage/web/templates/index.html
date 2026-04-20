@@ -409,7 +409,7 @@ function refreshStatus() {
 
     // Highlight active playlist row
     document.querySelectorAll('.playlist-row').forEach(row => {
-      const isActive = s.current && row.dataset.id === s.current.id;
+      const isActive = s.current && row.dataset.id === String(s.current.id);
       row.classList.toggle('active-row', isActive);
       row.classList.toggle('inactive-row', false);
       // Update NOW badge

@@ -272,7 +272,7 @@ journalctl -u led-signage -f
 ### Before Packaging
 
 1. Compile all Python files: `python3 -m py_compile <file>.py`
-2. Verify Jinja2 templates: `python3 -c "from jinja2 import ..."`
+2. Verify Jinja2 templates: `python3 -c "from jinja2 import Template; Template('{{1}}').render()"`
 3. Clean cache: `find . -name __pycache__ -exec rm -rf {} +`
 4. Package: `tar -czf led-signage.tar.gz --exclude='**/__pycache__' led-signage/`
 

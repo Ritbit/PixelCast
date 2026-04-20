@@ -56,6 +56,15 @@ def file_type(filename):
 # ---------------------------------------------------------------------------
 main_bp = Blueprint('main', __name__)
 
+import pathlib as _pathlib
+_BRAND_DIR = _pathlib.Path(__file__).parent.parent.parent / 'media'
+
+
+@main_bp.route('/brand/<path:filename>')
+def brand(filename):
+    """Serve branding assets (favicons, logos) without requiring login."""
+    return send_from_directory(str(_BRAND_DIR), filename)
+
 
 @main_bp.route('/')
 @login_required
@@ -156,7 +165,8 @@ def settings():
                     flash('Cannot delete your own account.', 'error')
                 elif uname not in users:
                     flash('User not found.', 'error')
-                elif sum(1 for u in users.values() if u.get('role')=='admin') < 2                      and users[uname].get('role') == 'admin':
+                elif (sum(1 for u in users.values() if u.get('role')=='admin') < 2
+                      and users[uname].get('role') == 'admin'):
                     flash('Cannot delete the last admin account.', 'error')
                 else:
                     del users[uname]
@@ -175,7 +185,8 @@ def settings():
                     flash('Cannot change your own role.', 'error')
                 elif uname not in users:
                     flash('User not found.', 'error')
-                elif sum(1 for u in users.values() if u.get('role')=='admin') < 2                      and users[uname].get('role') == 'admin' and new_role != 'admin':
+                elif (sum(1 for u in users.values() if u.get('role')=='admin') < 2
+                      and users[uname].get('role') == 'admin' and new_role != 'admin'):
                     flash('Cannot demote the last admin.', 'error')
                 else:
                     users[uname]['role'] = new_role
@@ -350,6 +361,7 @@ def add():
 
 @playlist_bp.route('/delete/<item_id>', methods=['POST'])
 @login_required
+@require_role('editor')
 def delete(item_id):
     playlist = current_app.config['PLAYLIST']
     if playlist.delete_item(item_id):
@@ -362,6 +374,7 @@ def delete(item_id):
 
 @playlist_bp.route('/move/<item_id>/<direction>', methods=['POST'])
 @login_required
+@require_role('editor')
 def move(item_id, direction):
     playlist = current_app.config['PLAYLIST']
     playlist.move_item(item_id, direction)
@@ -370,6 +383,7 @@ def move(item_id, direction):
 
 @playlist_bp.route('/duplicate/<item_id>', methods=['POST'])
 @login_required
+@require_role('editor')
 def duplicate(item_id):
     playlist = current_app.config['PLAYLIST']
     playlist.duplicate_item(item_id)
@@ -658,6 +672,7 @@ def upload():
 
 @files_bp.route('/delete/<filename>', methods=['POST'])
 @login_required
+@require_role('editor')
 def delete(filename):
     from signage.transcoder import matrix_path
     media_dir = current_app.config['MEDIA_DIR']

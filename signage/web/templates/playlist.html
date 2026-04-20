@@ -468,7 +468,10 @@ if (tbody) {
     dragged.classList.add('dragging');
   });
   tbody.addEventListener('dragend', e => {
-    dragged.classList.remove('dragging');
+    if (dragged) {
+      dragged.classList.remove('dragging');
+      dragged = null;
+    }
     document.querySelectorAll('.item-row').forEach(r => r.classList.remove('drag-over'));
     // Send new order to server
     const ids = [...tbody.querySelectorAll('tr[data-id]')].map(r => r.dataset.id);

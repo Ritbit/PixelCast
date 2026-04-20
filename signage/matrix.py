@@ -4,7 +4,7 @@
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/matrix.py                                               ║
 ║ Version:     1.0.0                                                           ║
-║ Author:      Bas                                                             ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Core matrix engine - manages the display loop, renderer         ║
 ║              lifecycle, transitions, frame caching, and alert overlays.      ║
 ║              Runs in dedicated daemon thread with exclusive RGBMatrix access.║
@@ -265,7 +265,8 @@ class MatrixEngine:
         while not self._stop_event.is_set():
 
             # Pause handling (manual pause)
-            while self._pause_event.is_set() and not self._stop_event.is_set()                   and not self._test_mode.is_set():
+            while (self._pause_event.is_set() and not self._stop_event.is_set()
+                   and not self._test_mode.is_set()):
                 time.sleep(0.1)
 
             # Screen test mode — engine idles while test thread drives the display

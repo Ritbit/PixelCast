@@ -315,9 +315,9 @@
                   onclick="showResetPw('{{ username }}')">🔑 Reset PW</button>
           <!-- Delete (not self, not last admin) -->
           {% if username != current_user.id %}
-          <form method="post" onsubmit="return confirm('Delete user {{ username }}?')">
+          <form method="post" onsubmit="return confirmUserDelete(this)" data-username="{{ username | e }}">
             <input type="hidden" name="action" value="delete_user">
-            <input type="hidden" name="target_user" value="{{ username }}">
+            <input type="hidden" name="target_user" value="{{ username | e }}">
             <button class="btn btn-sm btn-danger" type="submit">✕ Delete</button>
           </form>
           {% endif %}
@@ -559,7 +559,13 @@ function sysAction(url, confirmMsg) {
       msg.style.color = 'var(--accent2)';
     });
 }
-</script>
+
+function confirmUserDelete(form) {
+  const name = form.dataset.username;
+  const msg = document.createElement('span');
+  msg.textContent = name;
+  return confirm('Delete user ' + msg.textContent + '?');
+}
 </script>
 <script>
 function showResetPw(u) {

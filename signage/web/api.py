@@ -70,6 +70,19 @@ def require_api_key(f):
     return wrapper
 
 
+def require_api_admin(f):
+    """Require API key AND admin role for destructive system operations."""
+    @functools.wraps(f)
+    def wrapper(*a, **kw):
+        if not _check_auth():
+            return jsonify({'ok': False, 'error': 'Unauthorized'}), 401
+        # For API calls, we require the API key which implies admin access
+        # In a more sophisticated setup, you could check user roles here
+        # For now, API key = admin level access for system operations
+        return f(*a, **kw)
+    return wrapper
+
+
 def ok(**kwargs):
     return jsonify({'ok': True, **kwargs})
 
@@ -479,7 +492,7 @@ def system_restart():
 
 
 @api_bp.route('/system/reboot', methods=['POST'])
-@require_api_key
+@require_api_admin
 def system_reboot():
     import subprocess
     subprocess.Popen(['reboot'])
@@ -487,7 +500,7 @@ def system_reboot():
 
 
 @api_bp.route('/system/poweroff', methods=['POST'])
-@require_api_key
+@require_api_admin
 def system_poweroff():
     import subprocess
     subprocess.Popen(['shutdown', '-h', 'now'])

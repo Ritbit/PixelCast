@@ -359,8 +359,11 @@ class TextRenderer(BaseRenderer):
         # For scrolling lines, show their first slice as the first frame
         for l in self._lines:
             if l['scroll'] in ('left','right') and l['h_strip'] is not None:
-                # paste first W columns of h_strip into frame
-                frame[:, :self.width] = l['h_strip'][:self.height, :self.width]
+                # paste first W columns of h_strip into this line's row range
+                y0 = l.get('_auto_y', 0) if l['pos_key'] is None else self._explicit_y(l)
+                lh = l['line_h']
+                y1 = min(y0 + lh, self.height)
+                frame[y0:y1, :self.width] = l['h_strip'][y0:y1, :self.width]
             elif l['scroll'] in ('up','down') and l['v_strip'] is not None:
                 frame[:self.height, :] = l['v_strip'][:self.height, :]
         return frame
@@ -419,11 +422,14 @@ class TextRenderer(BaseRenderer):
                     W       = self.width
                     strip_w = strip.shape[1]
                     ox      = int(l['offset']) % (strip_w // 2)
-                    sl      = strip[:self.height, ox:ox+W]
+                    y0 = l.get('_auto_y', 0) if l['pos_key'] is None else self._explicit_y(l)
+                    lh = l['line_h']
+                    y1 = min(y0 + lh, self.height)
+                    sl = strip[y0:y1, ox:ox+W]
                     if sl.shape[1] < W:
                         sl = np.concatenate(
-                            [sl, strip[:self.height, :W-sl.shape[1]]], axis=1)
-                    frame[:, :W] = sl
+                            [sl, strip[y0:y1, :W-sl.shape[1]]], axis=1)
+                    frame[y0:y1, :W] = sl
                     l['offset'] += l['speed'] * (1 if sc=='left' else -1)
 
                 elif sc in ('up','down') and l['v_strip'] is not None:

@@ -158,8 +158,7 @@ renderer._done         → bool, set True when content complete (for auto-durati
   "type": "clock|text|image|gif|video|weather|countdown",
   "name": "Display name",
   "enabled": true,
-  "duration": 15,
-  "duration": "auto",
+  "duration": 15,        // or "auto" for video/GIF natural duration
   "wipe_in": "fade",
   "wipe_in_speed": 1.0,
   "wipe_out": "slide_left",

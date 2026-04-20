@@ -202,19 +202,35 @@ function pushHistory(key, val) {
 
 function updateDiskList(disks) {
   const el = document.getElementById('disk-list');
-  el.innerHTML = disks.map(d => {
+  el.innerHTML = '';
+  disks.forEach(d => {
     const cls = gaugeClass(d.percent);
-    return `
-    <div class="disk-row">
-      <div class="disk-label">${d.label}</div>
-      <div class="disk-track">
-        <div class="gauge-track">
-          <div class="gauge-fill ${cls}" style="width:${d.percent}%"></div>
-        </div>
-      </div>
-      <div class="disk-nums">${d.used_gb}/${d.total_gb} GB</div>
-    </div>`;
-  }).join('');
+    const row = document.createElement('div');
+    row.className = 'disk-row';
+
+    const label = document.createElement('div');
+    label.className = 'disk-label';
+    label.textContent = d.label;
+
+    const track = document.createElement('div');
+    track.className = 'disk-track';
+    const gaugeTrack = document.createElement('div');
+    gaugeTrack.className = 'gauge-track';
+    const fill = document.createElement('div');
+    fill.className = `gauge-fill ${cls}`;
+    fill.style.width = d.percent + '%';
+    gaugeTrack.appendChild(fill);
+    track.appendChild(gaugeTrack);
+
+    const nums = document.createElement('div');
+    nums.className = 'disk-nums';
+    nums.textContent = `${d.used_gb}/${d.total_gb} GB`;
+
+    row.appendChild(label);
+    row.appendChild(track);
+    row.appendChild(nums);
+    el.appendChild(row);
+  });
 }
 
 function fetchStats() {

@@ -19,6 +19,7 @@
 </div>
 
 <form method="post" id="schedule-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="action" value="save">
 
   <div class="card">

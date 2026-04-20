@@ -98,7 +98,7 @@ function applyFilter() {
     else if (lower.includes(' warn')  || lower.includes('[warn]'))  cls = 'log-warning';
     else if (lower.includes(' info')  || lower.includes('[info]'))  cls = 'log-info';
     else if (lower.includes(' debug') || lower.includes('[debug]')) cls = 'log-debug';
-    const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     return `<div class="log-line ${cls}">${esc}</div>`;
   }).join('');
 

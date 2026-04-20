@@ -4,9 +4,9 @@
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/transitions/__init__.py                                 ║
 ║ Version:     1.0.0                                                           ║
-║ Author:      Bas                                                             ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Transition factory - creates transition effect instances by     ║
-║              name. Supports 22 effects including fades, wipes, slides, etc.  ║
+║              name. Supports 21 effects including fades, wipes, slides, etc.  ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 

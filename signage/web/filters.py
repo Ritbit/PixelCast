@@ -19,8 +19,8 @@ def register_filters(app):
         if not value and value != 0:
             return ''
         s = str(value).strip()
-        # If already looks like a timecode string, return as-is
-        if ':' in s or (s.count('.') == 1 and not s.startswith('0.')):
+        # If already looks like a timecode string (contains colon), return as-is
+        if ':' in s:
             return s
         # Plain float seconds — convert to timecode display
         try:

@@ -30,6 +30,8 @@ def matrix_path(original_path: str) -> str:
 
 def is_transcoded(path: str) -> bool:
     """Return True if a transcoded version exists and is newer than original."""
+    if not os.path.exists(path):
+        return False
     mp = matrix_path(path)
     if not os.path.exists(mp):
         return False
@@ -142,7 +144,25 @@ def transcode(path: str, display_width: int, display_height: int,
                 except Exception:
                     pass
 
-        proc.wait(timeout=300)
+        try:
+            proc.wait(timeout=300)
+        except subprocess.TimeoutExpired:
+            log.error(f"ffmpeg timed out transcoding {path}")
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            if proc.stderr:
+                stderr = proc.stderr.read()
+                log.error(f"ffmpeg stderr: {stderr[-500:]}")
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            if on_progress:
+                on_progress(0)
+            if on_complete:
+                on_complete(False, '')
+            return
 
         if proc.returncode == 0 and os.path.exists(tmp):
             os.rename(tmp, out)

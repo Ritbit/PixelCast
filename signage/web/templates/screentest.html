@@ -74,31 +74,31 @@
 <div class="card">
   <div class="card-title">Test Patterns</div>
   <div class="test-grid">
-    <div class="test-btn" onclick="sendTest('pattern','gradient_h')">
+    <div class="test-btn" onclick="sendTest('pattern','gradient_h',event)">
       <div class="swatch" style="background:linear-gradient(to right,#000,#fff);"></div>H Gradient
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','gradient_v')">
+    <div class="test-btn" onclick="sendTest('pattern','gradient_v',event)">
       <div class="swatch" style="background:linear-gradient(to bottom,#000,#fff);"></div>V Gradient
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','rainbow_h')">
+    <div class="test-btn" onclick="sendTest('pattern','rainbow_h',event)">
       <div class="swatch" style="background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f);"></div>Rainbow H
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','checkerboard')">
+    <div class="test-btn" onclick="sendTest('pattern','checkerboard',event)">
       <div class="swatch" style="background: repeating-conic-gradient(#555 0% 25%, #222 0% 50%) 0 0/12px 12px;"></div>Checkerboard
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','grid')">
+    <div class="test-btn" onclick="sendTest('pattern','grid',event)">
       <div class="swatch" style="background:#111; background-image: linear-gradient(#444 1px,transparent 1px),linear-gradient(90deg,#444 1px,transparent 1px); background-size:12px 6px;"></div>Grid
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','crosshair')">
+    <div class="test-btn" onclick="sendTest('pattern','crosshair',event)">
       <div class="swatch" style="background:#111; position:relative;">
         <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#0f0;"></div>
         <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#0f0;"></div>
       </div>Crosshair
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','border')">
+    <div class="test-btn" onclick="sendTest('pattern','border',event)">
       <div class="swatch" style="background:#111;border:3px solid #0f0;box-sizing:border-box;"></div>Border
     </div>
-    <div class="test-btn" onclick="sendTest('pattern','pixels')">
+    <div class="test-btn" onclick="sendTest('pattern','pixels',event)">
       <div class="swatch" style="background:repeating-linear-gradient(45deg,#f00 0,#f00 2px,#0f0 2px,#0f0 4px,#00f 4px,#00f 6px);"></div>RGB Pixels
     </div>
   </div>
@@ -107,21 +107,21 @@
 <div class="card">
   <div class="card-title">Animated Tests</div>
   <div class="test-grid">
-    <div class="test-btn" onclick="sendTest('anim','color_fade')">
+    <div class="test-btn" onclick="sendTest('anim','color_fade',event)">
       <div class="fade-bar"></div>Color Fade
     </div>
-    <div class="test-btn" onclick="sendTest('anim','brightness_ramp')">
+    <div class="test-btn" onclick="sendTest('anim','brightness_ramp',event)">
       <div class="swatch" style="background:linear-gradient(to right,#000,#fff);"></div>Brightness Ramp
     </div>
-    <div class="test-btn" onclick="sendTest('anim','flash_rgb')">
+    <div class="test-btn" onclick="sendTest('anim','flash_rgb',event)">
       <div class="swatch" style="background:linear-gradient(135deg,#f00 33%,#0f0 33% 66%,#00f 66%);"></div>Flash RGB
     </div>
-    <div class="test-btn" onclick="sendTest('anim','scan_h')">
+    <div class="test-btn" onclick="sendTest('anim','scan_h',event)">
       <div class="swatch" style="background:#111; position:relative; overflow:hidden;">
         <div style="position:absolute;left:0;right:0;top:40%;height:2px;background:#fff;"></div>
       </div>H Scan Line
     </div>
-    <div class="test-btn" onclick="sendTest('anim','scan_v')">
+    <div class="test-btn" onclick="sendTest('anim','scan_v',event)">
       <div class="swatch" style="background:#111; position:relative; overflow:hidden;">
         <div style="position:absolute;top:0;bottom:0;left:45%;width:2px;background:#fff;"></div>
       </div>V Scan Line
@@ -152,9 +152,9 @@
 <script>
 let testTimer = null;
 
-function sendTest(type, param) {
+function sendTest(type, param, event) {
   document.querySelectorAll('.test-btn').forEach(b => b.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  if (event && event.currentTarget) event.currentTarget.classList.add('active');
 
   const dur = parseInt(document.getElementById('test-duration').value);
   const status = document.getElementById('test-status');

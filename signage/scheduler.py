@@ -20,6 +20,10 @@ import time
 import logging
 import threading
 from datetime import datetime
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 
 log = logging.getLogger('scheduler')
 
@@ -100,7 +104,13 @@ class Scheduler:
         if not rules:
             return
 
-        now     = datetime.now()
+        tz_name = self._cfg.get('timezone', 'UTC')
+        try:
+            tz = ZoneInfo(tz_name)
+        except Exception:
+            log.warning(f"Invalid timezone '{tz_name}', falling back to UTC")
+            tz = ZoneInfo('UTC')
+        now     = datetime.now(tz=tz)
         weekday = now.weekday()   # 0=Monday, 6=Sunday
         now_min = now.hour * 60 + now.minute
 

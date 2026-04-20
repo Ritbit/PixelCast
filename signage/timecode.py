@@ -66,9 +66,10 @@ def seconds_to_timecode(seconds: float, fps: float = 25.0) -> str:
     Convert a float seconds value back to hh:mm:ss.ff display string.
     Only includes hours if >= 1 hour.
     """
+    fps_rounded  = round(fps)
     total_frames = round(seconds * fps)
-    frames       = total_frames % int(fps)
-    total_secs   = total_frames // int(fps)
+    frames       = total_frames % fps_rounded
+    total_secs   = total_frames // fps_rounded
     secs         = total_secs % 60
     total_mins   = total_secs // 60
     mins         = total_mins % 60

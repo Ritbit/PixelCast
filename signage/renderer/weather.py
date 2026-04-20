@@ -444,11 +444,17 @@ class WeatherRenderer(BaseRenderer):
         return np.array(canvas, dtype=np.uint8)
 
     def first_frame(self) -> np.ndarray:
-        # Don't hold _lock while calling _render() — _render() acquires
-        # _lock internally to read self._data, causing a deadlock with RLock
-        if self._frame is None:
-            self._frame = self._render()
-        return self._frame.copy()
+        # Check under lock, render outside to avoid deadlock with _lock in _render()
+        with self._lock:
+            frame = self._frame
+        if frame is None:
+            frame = self._render()
+            with self._lock:
+                if self._frame is None:
+                    self._frame = frame
+                else:
+                    frame = self._frame
+        return frame.copy()
 
     def frames(self):
         """
@@ -463,11 +469,14 @@ class WeatherRenderer(BaseRenderer):
         while True:
             now = time.time()
 
-            # Kick off a data refresh in background if due
-            if now - self._last_fetch > self._interval:
+            # Kick off a data refresh in background if due (atomic check-and-set)
+            with self._lock:
+                needs_refresh = now - self._last_fetch > self._interval
+                if needs_refresh:
+                    self._last_fetch = now
+            if needs_refresh:
                 threading.Thread(target=self._refresh,
                                  daemon=True).start()
-                self._last_fetch = now   # prevent multiple spawns
 
             # Re-render frame once per minute (or on first call)
             # NOTE: _render() acquires _lock internally to read self._data,

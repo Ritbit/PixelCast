@@ -15,12 +15,42 @@
 
 import os
 import time
+import threading
 import subprocess
 import logging
 
 log = logging.getLogger('sysinfo')
 
 _start_time = time.time()
+
+# Background CPU sampler — avoids blocking request threads with sleep()
+_cpu_cache: float = 0.0
+_cpu_lock  = threading.Lock()
+
+def _cpu_refresh_loop():
+    global _cpu_cache
+    while True:
+        try:
+            with open('/proc/stat') as f:
+                line = f.readline()
+            fields = list(map(int, line.split()[1:]))
+            idle1, total1 = fields[3], sum(fields)
+            time.sleep(0.5)
+            with open('/proc/stat') as f:
+                line = f.readline()
+            fields = list(map(int, line.split()[1:]))
+            idle2, total2 = fields[3], sum(fields)
+            total_d = total2 - total1
+            if total_d > 0:
+                val = round((1 - (idle2 - idle1) / total_d) * 100, 1)
+                with _cpu_lock:
+                    _cpu_cache = val
+        except Exception:
+            pass
+        time.sleep(4.5)
+
+_cpu_thread = threading.Thread(target=_cpu_refresh_loop, daemon=True, name='CpuSampler')
+_cpu_thread.start()
 
 
 def uptime_seconds() -> float:
@@ -35,32 +65,13 @@ def uptime_seconds() -> float:
 
 def cpu_percent() -> float:
     """
-    Read CPU usage percentage from /proc/stat.
-    Takes two samples 100ms apart for accurate measurement.
-    
+    Return cached CPU usage percentage. Updated every ~5s by background thread.
+
     Returns:
         float: CPU usage percentage (0-100)
     """
-    try:
-        with open('/proc/stat') as f:
-            line = f.readline()
-        fields = list(map(int, line.split()[1:]))
-        idle   = fields[3]
-        total  = sum(fields)
-        # Call twice with a short gap for accurate reading
-        time.sleep(0.1)
-        with open('/proc/stat') as f:
-            line = f.readline()
-        fields2 = list(map(int, line.split()[1:]))
-        idle2   = fields2[3]
-        total2  = sum(fields2)
-        idle_d  = idle2  - idle
-        total_d = total2 - total
-        if total_d == 0:
-            return 0.0
-        return round((1 - idle_d / total_d) * 100, 1)
-    except Exception:
-        return 0.0
+    with _cpu_lock:
+        return _cpu_cache
 
 
 def memory_info() -> dict:

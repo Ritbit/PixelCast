@@ -4,7 +4,7 @@
 {% block content %}
 <div style="max-width:360px; margin:80px auto;">
   <div style="text-align:center; margin-bottom:32px;">
-    <img src="{{ url_for('static', filename='../media/pixelcast-logo-adaptive.svg') }}" 
+    <img src="{{ url_for('main.brand', filename='pixelcast-logo-adaptive.svg') }}" 
          alt="PixelCast" 
          style="height:80px; width:auto; margin-bottom:16px;">
     <p class="text-muted" style="margin-top:4px; font-size:13px;">Sign in to manage your display</p>
@@ -12,6 +12,7 @@
 
   <div class="card">
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="form-group">
         <label>Username</label>
         <input type="text" name="username" autofocus autocomplete="username" required>
@@ -26,7 +27,7 @@
     </form>
   </div>
   <p class="text-muted" style="text-align:center; margin-top:12px; font-size:12px;">
-    Default credentials: admin / admin — change in Settings after first login.
+    First time? Create an admin account to get started.
   </p>
 </div>
 {% endblock %}

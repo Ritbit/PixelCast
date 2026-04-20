@@ -1,10 +1,10 @@
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║ PixelCast - Professional LED Matrix Signage System                          ║
+║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/clock.py                                       ║
 ║ Version:     1.0.0                                                           ║
-║ Author:      Bas                                                             ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Digital clock renderer - displays time and date with custom     ║
 ║              fonts, colors, and backgrounds. Supports pixel-perfect rendering║
 ║              for LED displays and optional blinking separator.               ║
@@ -53,10 +53,9 @@ class ClockRenderer(BaseRenderer):
 
     def __init__(self, item: dict, width: int, height: int):
         super().__init__(item, width, height)
-        self._item       = item
         self._time_fmt   = item.get('format',      '%H:%M:%S')
         self._date_fmt   = item.get('date_format', '%A %d %B %Y')
-        self._show_date  = bool(item.get('date_format', True))
+        self._show_date  = bool(self._date_fmt)
         self._time_color = parse_color(item.get('color',      [255, 220, 0]))
         self._date_color = parse_color(item.get('date_color', [180, 180, 180]))
         self._blink      = item.get('blink_separator', True)
@@ -65,7 +64,7 @@ class ClockRenderer(BaseRenderer):
         self._time_font  = find_font(item.get('time_font', 'FreeSansBold.ttf'), time_size)
         self._date_font  = find_font(item.get('date_font', 'FreeSans.ttf'),     date_size)
         # Pre-build background once — expensive for bg_image, cheap to copy
-        self._bg_cache = load_background(self.width, self.height, self._item)
+        self._bg_cache = load_background(self.width, self.height, item)
 
     def _get_bg(self) -> Image.Image:
         return self._bg_cache.copy()   # fast pixel copy, no I/O

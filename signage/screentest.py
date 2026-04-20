@@ -54,9 +54,18 @@ class ScreenTester:
         end_t  = time.time() + duration if duration > 0 else float('inf')
         try:
             if test_type == 'solid':
-                hx    = param.lstrip('#')
-                color = np.array([int(hx[i:i+2], 16) for i in (0, 2, 4)],
-                                 dtype=np.uint8)
+                hx = param.lstrip('#')
+                if len(hx) == 3:
+                    hx = ''.join(c * 2 for c in hx)
+                if len(hx) != 6 or not all(c in '0123456789abcdefABCDEF' for c in hx):
+                    log.warning(f"Invalid hex color '{param}', using white")
+                    hx = 'ffffff'
+                try:
+                    color = np.array([int(hx[i:i+2], 16) for i in (0, 2, 4)],
+                                     dtype=np.uint8)
+                except ValueError:
+                    log.warning(f"Failed to parse hex color '{param}', using white")
+                    color = np.array([255, 255, 255], dtype=np.uint8)
                 frame = np.full((h, w, 3), color, dtype=np.uint8)
                 while not self._stop.is_set() and time.time() < end_t:
                     self._engine.show_frame(frame, _from_test=True)

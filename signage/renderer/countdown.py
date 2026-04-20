@@ -4,7 +4,7 @@
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/countdown.py                                   ║
 ║ Version:     1.0.0                                                           ║
-║ Author:      Bas                                                             ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Countdown/countup timer renderer - flexible format with weeks,  ║
 ║              days, hours, minutes, seconds. Supports countdown to target or  ║
 ║              elapsed time from target with custom styling and labels.        ║
@@ -74,9 +74,10 @@ class CountdownRenderer(BaseRenderer):
 
         target_str      = item.get('target_date', '2026-12-31T00:00:00')
         try:
-            self._target = datetime.fromisoformat(target_str)
+            self._target = datetime.fromisoformat(
+                target_str.replace('Z', '+00:00'))
         except Exception:
-            self._target = datetime.now()
+            self._target = datetime.now(tz=timezone.utc)
 
         self._direction   = item.get('direction', 'down')
         self._finished    = item.get('finished_text', '🎉 Done!')
@@ -132,7 +133,10 @@ class CountdownRenderer(BaseRenderer):
             return f.getsize(t)[1]
 
     def _remaining(self) -> int:
-        now   = datetime.now()
+        if self._target.tzinfo is not None:
+            now = datetime.now(tz=self._target.tzinfo)
+        else:
+            now = datetime.now()
         delta = (self._target - now).total_seconds()
         return int(delta) if self._direction == 'down' else int(-delta)
 
