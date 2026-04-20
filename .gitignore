@@ -1,0 +1,35 @@
+# Development artifacts
+older-finicky-vibe-code/
+prompt-store
+Deploy_from_Download.sh
+
+# Archives
+*.gz
+*.zip
+*.tar
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Runtime data
+config/*.json
+!config/.gitkeep
+media/*
+!media/pixelcast-*.svg
+!media/weather-icons/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
