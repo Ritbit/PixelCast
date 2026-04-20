@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>PixelCast App Icon 512x512</title>
+  <rect width="512" height="512" rx="96" fill="#185FA5"/>
+  <!-- 5x5 dot grid, centered, dot radius 22, spacing 72 -->
+  <!-- grid width = 4*72 + 2*22 = 332, start x = (512-332)/2 = 90 -->
+  <!-- grid height = 332, start y = 90 -->
+  <circle cx="90"  cy="90"  r="22" fill="#60A8E8"/>
+  <circle cx="162" cy="90"  r="22" fill="#60A8E8"/>
+  <circle cx="234" cy="90"  r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="306" cy="90"  r="22" fill="#60A8E8"/>
+  <circle cx="378" cy="90"  r="22" fill="#60A8E8"/>
+
+  <circle cx="90"  cy="162" r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="162" cy="162" r="22" fill="#60A8E8"/>
+  <circle cx="234" cy="162" r="22" fill="#60A8E8"/>
+  <circle cx="306" cy="162" r="22" fill="#60A8E8"/>
+  <circle cx="378" cy="162" r="22" fill="#1E6FAF" opacity="0.45"/>
+
+  <circle cx="90"  cy="234" r="22" fill="#60A8E8"/>
+  <circle cx="162" cy="234" r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="234" cy="234" r="22" fill="#60A8E8"/>
+  <circle cx="306" cy="234" r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="378" cy="234" r="22" fill="#60A8E8"/>
+
+  <circle cx="90"  cy="306" r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="162" cy="306" r="22" fill="#60A8E8"/>
+  <circle cx="234" cy="306" r="22" fill="#60A8E8"/>
+  <circle cx="306" cy="306" r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="378" cy="306" r="22" fill="#60A8E8"/>
+
+  <circle cx="90"  cy="378" r="22" fill="#60A8E8"/>
+  <circle cx="162" cy="378" r="22" fill="#60A8E8"/>
+  <circle cx="234" cy="378" r="22" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="306" cy="378" r="22" fill="#60A8E8"/>
+  <circle cx="378" cy="378" r="22" fill="#60A8E8"/>
+
+  <!-- Signal arcs from right of grid -->
+  <path d="M 400,234 Q 440,188 440,234 Q 440,280 400,234" fill="none" stroke="#60A8E8" stroke-width="12" stroke-linecap="round" opacity="0.95"/>
+  <path d="M 400,234 Q 458,164 458,234 Q 458,304 400,234" fill="none" stroke="#60A8E8" stroke-width="9" stroke-linecap="round" opacity="0.65"/>
+  <path d="M 400,234 Q 490,128 490,234 Q 490,340 400,234" fill="none" stroke="#60A8E8" stroke-width="7" stroke-linecap="round" opacity="0.38"/>
+</svg>

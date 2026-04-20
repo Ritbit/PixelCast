@@ -1,0 +1,601 @@
+{% extends 'base.html' %}
+{% block title %}Playlist — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+/* ── File picker modal ── */
+.fp-overlay {
+  display:none; position:fixed; inset:0; z-index:900;
+  background:rgba(0,0,0,.75); align-items:center; justify-content:center;
+}
+.fp-overlay.open { display:flex; }
+.fp-modal {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; width:min(820px,95vw); max-height:85vh;
+  display:flex; flex-direction:column; overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.6);
+}
+.fp-header {
+  padding:14px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.fp-header h3 { margin:0; font-size:15px; flex:1; }
+.fp-close {
+  background:none; border:none; color:var(--muted); font-size:20px;
+  cursor:pointer; padding:0 4px; line-height:1;
+}
+.fp-close:hover { color:var(--text); }
+.fp-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap:10px; padding:14px; overflow-y:auto; flex:1;
+}
+.fp-item {
+  background:var(--surface); border:2px solid var(--border);
+  border-radius:8px; overflow:hidden; cursor:pointer;
+  transition:border-color .15s, transform .1s;
+  display:flex; flex-direction:column;
+}
+.fp-item:hover { border-color:var(--accent); transform:translateY(-1px); }
+.fp-item.selected { border-color:var(--accent); background:rgba(79,142,247,.1); }
+.fp-thumb {
+  width:100%; aspect-ratio:16/9; background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  font-size:28px; overflow:hidden;
+}
+.fp-thumb img { width:100%; height:100%; object-fit:cover; }
+.fp-name {
+  font-size:10px; padding:5px 6px; line-height:1.3;
+  word-break:break-all; color:var(--text); flex:1;
+}
+.fp-footer {
+  padding:12px 18px; border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.fp-selected-name {
+  flex:1; font-size:13px; color:var(--muted); font-style:italic;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+</style>
+<style>
+.item-row { transition: background .15s; }
+.item-row.dragging { opacity: .4; }
+.item-row.drag-over { border-top: 2px solid var(--accent); }
+
+.add-panel { display:none; }
+.add-panel.active { display:block; }
+
+.tab-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--muted); padding: 6px 14px; border-radius: 6px;
+  cursor: pointer; font-size: 13px; transition: all .15s;
+}
+.tab-btn.active, .tab-btn:hover {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+
+.line-row { display:grid; grid-template-columns: 1fr auto auto auto auto; gap:8px; align-items:end; margin-bottom:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 class="page-title" style="margin:0;">Playlist</h1>
+  <button class="btn btn-primary" onclick="toggleAdd()">＋ Add Item</button>
+</div>
+
+<!-- Add Item Panel -->
+<div class="card add-panel" id="add-panel">
+  <div class="card-title">Add New Item</div>
+
+  <!-- Type tabs -->
+  <div style="display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;">
+    {% for t in ['clock','text','image','gif','video','weather','countdown'] %}
+    <button class="tab-btn {% if loop.first %}active{% endif %}"
+            onclick="selectType('{{ t }}')" id="tab-{{ t }}">
+      {{ t.title() }}
+    </button>
+    {% endfor %}
+  </div>
+
+  <form method="post" action="{{ url_for('playlist.add') }}">
+    <input type="hidden" name="type" id="f-type" value="clock">
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Item Name</label>
+        <input type="text" name="name" placeholder="My Clock" value="">
+      </div>
+      <div class="form-group">
+        <label>Duration (seconds)</label>
+        <input type="number" name="duration" value="15" min="1" max="3600">
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Wipe In</label>
+        <select name="wipe_in">
+          <option value="random">🎲 Random</option>
+          <option value="none">None</option>
+          {% for t in transitions %}
+          <option value="{{ t }}" {% if t=='fade' %}selected{% endif %}>{{ t.replace('_',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Wipe Out</label>
+        <select name="wipe_out">
+          <option value="random">🎲 Random</option>
+          <option value="none">None</option>
+          {% for t in transitions %}
+          <option value="{{ t }}" {% if t=='fade' %}selected{% endif %}>{{ t.replace('_',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Clock options -->
+    <div id="opts-clock">
+      <hr>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Time Format</label>
+          <input type="text" name="format" value="%H:%M:%S" placeholder="%H:%M:%S">
+        </div>
+        <div class="form-group">
+          <label>Date Format</label>
+          <input type="text" name="date_format" value="%A %d %B %Y">
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Time Color</label>
+          <input type="color" name="color" value="#ffdc00">
+        </div>
+        <div class="form-group">
+          <label>Background Color</label>
+          <input type="color" name="bg_color" value="#000000">
+        </div>
+      </div>
+    </div>
+
+    <!-- Text options -->
+    <div id="opts-text" style="display:none;">
+      <hr>
+      <div id="text-lines">
+        <div class="line-row">
+          <div class="form-group" style="margin:0;">
+            <label>Line Text</label>
+            <input type="text" name="line_text" placeholder="Hello World">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Color</label>
+            <input type="color" name="line_color" value="#ffffff">
+          </div>
+          <div class="form-group" style="margin:0; width:70px;">
+            <label>Size</label>
+            <input type="number" name="line_size" value="20" min="8" max="64">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Align</label>
+            <select name="line_align">
+              <option value="center">Center</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+          <div style="padding-top:18px;">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeLine(this)">✕</button>
+          </div>
+        </div>
+      </div>
+      <button type="button" class="btn btn-sm btn-secondary mt-8" onclick="addLine()">＋ Add Line</button>
+      <div class="grid-2 mt-8">
+        <div class="form-group">
+          <label>Background Color</label>
+          <input type="color" name="bg_color" value="#000000">
+        </div>
+        <div class="form-group">
+          <label>Scroll Text</label>
+          <select name="scroll">
+            <option value="0">No (static)</option>
+            <option value="1">Yes (ticker)</option>
+          </select>
+        </div>
+      </div>
+      <p class="text-muted" style="font-size:11px; margin-top:4px;">
+        Inline codes: §Crrggbb; = color &nbsp; §Fname; = font &nbsp; §Snn; = size &nbsp; §R = reset
+      </p>
+    </div>
+
+    <!-- Image / GIF / Video options -->
+    <div id="opts-media" style="display:none;">
+      <hr>
+      <!-- Hidden input — populated by the modal picker -->
+      <input type="hidden" name="media_file" id="add-media-file" value="">
+      <div class="form-group">
+        <label>Media File</label>
+        <div class="current-file-box" id="add-file-box"
+             style="margin-bottom:8px; display:none;">
+          <div class="current-file-thumb" id="add-file-thumb"
+               style="width:80px;height:45px;flex-shrink:0;background:var(--bg);
+                      border-radius:4px;overflow:hidden;display:flex;
+                      align-items:center;justify-content:center;font-size:20px;">
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:600;font-size:13px;" id="add-file-name">
+              No file selected
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-secondary"
+                onclick="openAddPicker()">
+          📁 Choose File…
+        </button>
+        <p class="text-muted" style="font-size:11px; margin-top:4px;">
+          Upload files first via the <a href="{{ url_for('files.index') }}">Files</a> page.
+        </p>
+      </div>
+      <div class="form-group">
+        <label>Scale Mode</label>
+        <select name="scale">
+          <option value="fit">Fit (letterbox)</option>
+          <option value="fill">Fill (crop)</option>
+          <option value="stretch">Stretch</option>
+        </select>
+      </div>
+    </div>
+    <!-- Video-only options shown via JS -->
+    <div id="opts-video-extra" style="display:none;">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Start Offset</label>
+          <input type="text" name="start_offset" value=""
+                 placeholder="0  or  3.20  or  1:45  or  1:02:30.05">
+          <div class="text-muted" style="font-size:11px; margin-top:3px;">
+            ss &nbsp;|&nbsp; ss.ff &nbsp;|&nbsp; mm:ss &nbsp;|&nbsp; hh:mm:ss.ff
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Loop Mode</label>
+          <select name="loop_mode">
+            <option value="restart">Restart from beginning</option>
+            <option value="pingpong">Ping-pong</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:8px; margin-top:16px;">
+      <button type="submit" class="btn btn-success">Add to Playlist</button>
+      <button type="button" class="btn btn-secondary" onclick="toggleAdd()">Cancel</button>
+    </div>
+  </form>
+</div>
+
+<!-- Import / Export -->
+<div class="card">
+  <div class="card-title">Import / Export</div>
+  <div style="display:flex; gap:24px; flex-wrap:wrap;">
+
+    <div>
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Export</div>
+      <div style="display:flex; gap:8px;">
+        <a class="btn btn-secondary btn-sm"
+           href="{{ url_for('playlist.export_playlist') }}">
+          ⬇ playlist.json
+        </a>
+        <a class="btn btn-secondary btn-sm"
+           href="{{ url_for('playlist.export_with_media') }}">
+          ⬇ playlist + media (.zip)
+        </a>
+      </div>
+    </div>
+
+    <div style="flex:1; min-width:280px;">
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Import</div>
+      <form method="post" action="{{ url_for('playlist.import_playlist') }}"
+            enctype="multipart/form-data">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input type="file" name="import_file"
+                 accept=".json,.zip"
+                 style="flex:1; min-width:160px; background:var(--surface);
+                        border:1px solid var(--border); color:var(--text);
+                        padding:6px 10px; border-radius:6px; font-size:13px;">
+          <select name="import_mode" style="width:120px;">
+            <option value="replace">Replace all</option>
+            <option value="merge">Merge / append</option>
+          </select>
+          <button type="submit" class="btn btn-sm btn-primary"
+                  onclick="return confirm(
+                    document.querySelector('[name=import_mode]').value === 'replace'
+                    ? 'Replace the entire playlist?'
+                    : 'Append imported items to current playlist?'
+                  )">
+            ⬆ Import
+          </button>
+        </div>
+        <p class="text-muted" style="font-size:11px; margin-top:6px;">
+          Accepts playlist.json or a .zip from "playlist + media" export.
+          Replace overwrites the whole playlist; Merge appends items.
+        </p>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<!-- Playlist table -->
+<div class="card">
+  <div class="card-title">Current Playlist ({{ items|length }} items) — drag to reorder</div>
+
+  {% if items %}
+  <table id="playlist-table">
+    <thead>
+      <tr>
+        <th style="width:24px;"></th>
+        <th>#</th>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Duration</th>
+        <th>Wipe In</th>
+        <th>Wipe Out</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="sortable">
+      {% for item in items %}
+      <tr class="item-row" draggable="true" data-id="{{ item.id }}">
+        <td class="drag-handle">⠿</td>
+        <td class="text-muted">{{ loop.index }}</td>
+        <td>
+          <strong>{{ item.get('name','—') }}</strong>
+          {% if item.type == 'text' %}
+          <div class="text-muted" style="font-size:11px;">
+            {{ item.get('lines',[{}])[0].get('text','')[:40] }}
+          </div>
+          {% elif item.type in ('image','gif','video') %}
+          <div class="text-muted" style="font-size:11px;">
+            {{ item.get('file','') | basename }}
+          </div>
+          {% endif %}
+        </td>
+        <td><span class="badge badge-{{ item.type }}">{{ item.type }}</span></td>
+        <td>{{ item.get('duration',10) }}s</td>
+        <td class="text-muted" style="font-size:12px;">{{ item.get('wipe_in','—') }}</td>
+        <td class="text-muted" style="font-size:12px;">{{ item.get('wipe_out','—') }}</td>
+        <td>
+          <div style="display:flex; gap:4px;">
+            <a class="btn btn-sm btn-secondary"
+               href="{{ url_for('playlist.edit', item_id=item.id) }}">✏️</a>
+            <form method="post" action="{{ url_for('playlist.move', item_id=item.id, direction='up') }}"
+                  style="display:inline;">
+              <button class="btn btn-sm btn-secondary btn-icon">↑</button>
+            </form>
+            <form method="post" action="{{ url_for('playlist.move', item_id=item.id, direction='down') }}"
+                  style="display:inline;">
+              <button class="btn btn-sm btn-secondary btn-icon">↓</button>
+            </form>
+            <form method="post" action="{{ url_for('playlist.duplicate', item_id=item.id) }}"
+                  style="display:inline;">
+              <button class="btn btn-sm btn-secondary btn-icon" title="Duplicate">⧉</button>
+            </form>
+            <form method="post" action="{{ url_for('playlist.delete', item_id=item.id) }}"
+                  style="display:inline;"
+                  onsubmit="return confirm('Delete this item?')">
+              <button class="btn btn-sm btn-danger btn-icon">✕</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-muted" style="padding:16px 0;">
+    No playlist items yet. Click <strong>Add Item</strong> above to get started.
+  </p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Jinja basename filter workaround
+// (handled server-side via custom filter or just split)
+
+// --- Type selector ---
+function selectType(t) {
+  document.getElementById('f-type').value = t;
+  ['clock','text','image','gif','video','weather','countdown'].forEach(x => {
+    document.getElementById('tab-' + x).classList.toggle('active', x === t);
+    const el = document.getElementById('opts-' + x);
+    if (el) el.style.display = (x === t || (x === 'media' && ['image','gif','video'].includes(t))) ? '' : 'none';
+  });
+  // Media opts shared by image/gif/video
+  const media = document.getElementById('opts-media');
+  media.style.display = ['image','gif','video'].includes(t) ? '' : 'none';
+  const videoExtra = document.getElementById('opts-video-extra');
+  if (videoExtra) videoExtra.style.display = (t === 'video') ? '' : 'none';
+}
+
+function toggleAdd() {
+  const p = document.getElementById('add-panel');
+  p.classList.toggle('active');
+  if (p.classList.contains('active')) p.scrollIntoView({behavior:'smooth'});
+}
+
+// --- Text line builder ---
+function addLine() {
+  const c = document.getElementById('text-lines');
+  const row = document.createElement('div');
+  row.className = 'line-row';
+  row.innerHTML = `
+    <div class="form-group" style="margin:0;">
+      <input type="text" name="line_text" placeholder="Text line">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <input type="color" name="line_color" value="#ffffff">
+    </div>
+    <div class="form-group" style="margin:0; width:70px;">
+      <input type="number" name="line_size" value="16" min="8" max="64">
+    </div>
+    <div class="form-group" style="margin:0;">
+      <select name="line_align">
+        <option value="center">Center</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+    <div><button type="button" class="btn btn-sm btn-danger" onclick="removeLine(this)">✕</button></div>
+  `;
+  c.appendChild(row);
+}
+
+function removeLine(btn) {
+  const rows = document.querySelectorAll('.line-row');
+  if (rows.length > 1) btn.closest('.line-row').remove();
+}
+
+// --- Drag-to-reorder ---
+const tbody = document.getElementById('sortable');
+if (tbody) {
+  let dragged = null;
+
+  tbody.addEventListener('dragstart', e => {
+    dragged = e.target.closest('tr');
+    dragged.classList.add('dragging');
+  });
+  tbody.addEventListener('dragend', e => {
+    dragged.classList.remove('dragging');
+    document.querySelectorAll('.item-row').forEach(r => r.classList.remove('drag-over'));
+    // Send new order to server
+    const ids = [...tbody.querySelectorAll('tr[data-id]')].map(r => r.dataset.id);
+    fetch('{{ url_for("playlist.reorder") }}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ids})
+    });
+  });
+  tbody.addEventListener('dragover', e => {
+    e.preventDefault();
+    const row = e.target.closest('tr');
+    if (row && row !== dragged) {
+      document.querySelectorAll('.item-row').forEach(r => r.classList.remove('drag-over'));
+      row.classList.add('drag-over');
+      const rect = row.getBoundingClientRect();
+      const mid  = rect.top + rect.height / 2;
+      if (e.clientY < mid) tbody.insertBefore(dragged, row);
+      else tbody.insertBefore(dragged, row.nextSibling);
+    }
+  });
+}
+</script>
+<!-- ── Shared file picker modal (same as edit_item.html) ── -->
+<div class="fp-overlay" id="fp-overlay" onclick="if(event.target===this)closePicker()">
+  <div class="fp-modal">
+    <div class="fp-header">
+      <h3 id="fp-title">Choose File</h3>
+      <input type="text" id="fp-search" placeholder="🔍 Filter…"
+             style="width:180px;font-size:13px;"
+             oninput="filterPicker(this.value)">
+      <button class="fp-close" onclick="closePicker()">✕</button>
+    </div>
+    <div class="fp-grid" id="fp-grid"></div>
+    <div class="fp-footer">
+      <span class="fp-selected-name" id="fp-selected-label">No file selected</span>
+      <button class="btn btn-secondary" onclick="closePicker()">Cancel</button>
+      <button class="btn btn-success" id="fp-confirm" onclick="confirmAddPicker()" disabled>
+        ✓ Select
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADD_MEDIA_FILES = {{ media_files | tojson }};
+const ADD_MEDIA_DIR   = {{ media_dir   | tojson }};
+const THUMB_URL       = '/files/thumb/';
+let _addPickerMode    = 'image_gif';
+let _addSelectedFile  = null;
+
+function openAddPicker() {
+  // Determine mode from currently selected type
+  const t = document.getElementById('f-type').value;
+  _addPickerMode   = t === 'video' ? 'video' : 'image_gif';
+  _addSelectedFile = null;
+  document.getElementById('fp-title').textContent =
+    t === 'video' ? 'Choose Video File' : 'Choose Image / GIF File';
+  document.getElementById('fp-selected-label').textContent = 'No file selected';
+  document.getElementById('fp-confirm').disabled = true;
+  document.getElementById('fp-search').value = '';
+  buildAddGrid('');
+  document.getElementById('fp-overlay').classList.add('open');
+}
+
+function closePicker() {
+  document.getElementById('fp-overlay').classList.remove('open');
+}
+
+function buildAddGrid(filter) {
+  const grid    = document.getElementById('fp-grid');
+  const allowed = _addPickerMode === 'video' ? ['video'] : ['image','gif'];
+  const items   = ADD_MEDIA_FILES.filter(f =>
+    allowed.includes(f.type) &&
+    (!filter || f.name.toLowerCase().includes(filter.toLowerCase()))
+  );
+  grid.innerHTML = '';
+  if (!items.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);">No files found.</div>';
+    return;
+  }
+  items.forEach(f => {
+    const emoji = f.type === 'video' ? '🎬' : f.type === 'gif' ? '🎞' : '🖼';
+    const div   = document.createElement('div');
+    div.className = 'fp-item';
+    div.dataset.name = f.name;
+    div.innerHTML = `
+      <div class="fp-thumb">
+        <img src="${THUMB_URL}${encodeURIComponent(f.name)}"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+             style="width:100%;height:100%;object-fit:cover;">
+        <div style="display:none;width:100%;height:100%;align-items:center;
+                    justify-content:center;font-size:28px;">${emoji}</div>
+      </div>
+      <div class="fp-name">${f.name}</div>`;
+    div.addEventListener('click', () => selectAddItem(f, div));
+    div.addEventListener('dblclick', () => { selectAddItem(f, div); confirmAddPicker(); });
+    grid.appendChild(div);
+  });
+}
+
+function filterPicker(val) { buildAddGrid(val); }
+
+function selectAddItem(file, el) {
+  _addSelectedFile = file;
+  document.querySelectorAll('.fp-item').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('fp-selected-label').textContent = file.name;
+  document.getElementById('fp-confirm').disabled = false;
+}
+
+function confirmAddPicker() {
+  if (!_addSelectedFile) return;
+  document.getElementById('add-media-file').value = _addSelectedFile.name;
+  document.getElementById('add-file-name').textContent = _addSelectedFile.name;
+  const emoji = _addSelectedFile.type === 'video' ? '🎬' : '🖼';
+  const th = document.getElementById('add-file-thumb');
+  th.innerHTML = `<img src="${THUMB_URL}${encodeURIComponent(_addSelectedFile.name)}"
+    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+    style="width:100%;height:100%;object-fit:cover;">
+    <div style="display:none;width:100%;height:100%;align-items:center;
+                justify-content:center;font-size:20px;">${emoji}</div>`;
+  document.getElementById('add-file-box').style.display = 'flex';
+  closePicker();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closePicker(); });
+</script>
+
+{% endblock %}

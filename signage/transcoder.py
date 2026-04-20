@@ -1,0 +1,195 @@
+"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ PixelCast - Professional LED Matrix Signage System                           ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ File:        signage/transcoder.py                                           ║
+║ Version:     1.0.0                                                           ║
+║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
+║ Description: Video transcoding service - resizes uploaded videos to display  ║
+║              resolution using ffmpeg. Reduces CPU load from 40-60% to 1-2%   ║
+║              and eliminates flickering on LED matrices.                      ║
+║                                                                              ║
+║ Important:   Creates .matrix.mp4 files alongside originals. VideoRenderer    ║
+║              automatically uses transcoded version if available.             ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+"""
+
+import os
+import subprocess
+import logging
+import threading
+
+log = logging.getLogger('transcoder')
+
+
+def matrix_path(original_path: str) -> str:
+    """Return the path for the transcoded version of a video file."""
+    base, ext = os.path.splitext(original_path)
+    return base + '.matrix' + (ext or '.mp4')
+
+
+def is_transcoded(path: str) -> bool:
+    """Return True if a transcoded version exists and is newer than original."""
+    mp = matrix_path(path)
+    if not os.path.exists(mp):
+        return False
+    return os.path.getmtime(mp) >= os.path.getmtime(path)
+
+
+def needs_transcode(path: str, display_width: int, display_height: int) -> bool:
+    """
+    Return True if the video should be transcoded.
+    Skips transcoding if the video is already at or near display resolution.
+    """
+    if is_transcoded(path):
+        return False
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'error',
+             '-select_streams', 'v:0',
+             '-show_entries', 'stream=width,height',
+             '-of', 'csv=p=0', path],
+            capture_output=True, text=True, timeout=10
+        )
+        parts = result.stdout.strip().split(',')
+        if len(parts) == 2:
+            w, h = int(parts[0]), int(parts[1])
+            # Don't transcode if already small
+            if w <= display_width * 2 and h <= display_height * 2:
+                log.debug(f"Video {path} is {w}x{h} — small enough, skipping transcode")
+                return False
+    except Exception as e:
+        log.warning(f"Could not probe {path}: {e}")
+    return True
+
+
+def transcode(path: str, display_width: int, display_height: int,
+              on_progress=None, on_complete=None):
+    """
+    Transcode a video to display resolution using ffmpeg.
+    Runs synchronously — call from a thread if you don't want to block.
+
+    Args:
+        path:           path to source video
+        display_width:  target width
+        display_height: target height
+        on_progress:    optional callback(percent: int)
+        on_complete:    optional callback(success: bool, out_path: str)
+    """
+    out = matrix_path(path)
+    tmp = out + '.tmp.mp4'
+
+    # Get source duration for progress calculation
+    duration_s = 0.0
+    try:
+        r = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'default=noprint_wrappers=1:nokey=1', path],
+            capture_output=True, text=True, timeout=10
+        )
+        duration_s = float(r.stdout.strip() or 0)
+    except Exception:
+        pass
+
+    # Build ffmpeg command
+    # - scale to fit display, pad with black to exact display size
+    # - libx264 at crf=23 (good quality, small file)
+    # - 25fps output (consistent frame rate for matrix timing)
+    # - strip audio (not needed for LED display)
+    vf = (
+        f"scale={display_width}:{display_height}"
+        f":force_original_aspect_ratio=decrease,"
+        f"pad={display_width}:{display_height}"
+        f":(ow-iw)/2:(oh-ih)/2:black"
+    )
+    cmd = [
+        'ffmpeg', '-y',
+        '-i', path,
+        '-vf', vf,
+        '-r', '25',          # normalise to 25fps
+        '-c:v', 'libx264',
+        '-crf', '23',
+        '-preset', 'fast',
+        '-an',               # no audio
+        '-movflags', '+faststart',
+        '-progress', 'pipe:1',
+        tmp
+    ]
+
+    log.info(f"Transcoding: {path} → {out}")
+    log.info(f"Command: {' '.join(cmd)}")
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+
+        # Parse ffmpeg progress output
+        while True:
+            line = proc.stdout.readline()
+            if not line:
+                break
+            line = line.strip()
+            if line.startswith('out_time_ms=') and duration_s > 0:
+                try:
+                    ms      = int(line.split('=')[1])
+                    pct     = min(99, int(ms / 1000 / duration_s * 100))
+                    if on_progress:
+                        on_progress(pct)
+                except Exception:
+                    pass
+
+        proc.wait(timeout=300)
+
+        if proc.returncode == 0 and os.path.exists(tmp):
+            os.rename(tmp, out)
+            log.info(f"Transcode complete: {out} "
+                     f"({os.path.getsize(out) // 1024}KB)")
+            if on_progress:
+                on_progress(100)
+            if on_complete:
+                on_complete(True, out)
+        else:
+            stderr = proc.stderr.read() if proc.stderr else ''
+            log.error(f"ffmpeg failed (code {proc.returncode}): {stderr[-500:]}")
+            if os.path.exists(tmp):
+                os.remove(tmp)
+            if on_complete:
+                on_complete(False, '')
+
+    except Exception as e:
+        log.error(f"Transcode error: {e}")
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except Exception:
+                pass
+        if on_complete:
+            on_complete(False, '')
+
+
+def transcode_async(path: str, display_width: int, display_height: int,
+                    on_complete=None):
+    """Start transcoding in a background thread. Returns the thread."""
+    t = threading.Thread(
+        target=transcode,
+        args=(path, display_width, display_height, None, on_complete),
+        name=f'Transcode-{os.path.basename(path)}',
+        daemon=True
+    )
+    t.start()
+    return t
+
+
+def resolve_video_path(path: str) -> str:
+    """
+    Return the best version of a video to play.
+    Uses the transcoded .matrix.mp4 if it exists, otherwise original.
+    """
+    mp = matrix_path(path)
+    if os.path.exists(mp):
+        return mp
+    return path

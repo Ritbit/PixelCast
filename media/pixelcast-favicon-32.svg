@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <title>PixelCast Favicon 32x32</title>
+  <rect width="32" height="32" rx="4" fill="#185FA5"/>
+  <!-- At 32px, simplified to 3x3 grid with arc - cleaner at small size -->
+  <!-- dot radius 2.5, spacing 7, start x=4, y=4 -->
+  <circle cx="4"  cy="4"  r="2.5" fill="#60A8E8"/>
+  <circle cx="11" cy="4"  r="2.5" fill="#60A8E8"/>
+  <circle cx="18" cy="4"  r="2.5" fill="#1E6FAF" opacity="0.45"/>
+
+  <circle cx="4"  cy="11" r="2.5" fill="#60A8E8"/>
+  <circle cx="11" cy="11" r="2.5" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="18" cy="11" r="2.5" fill="#60A8E8"/>
+
+  <circle cx="4"  cy="18" r="2.5" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="11" cy="18" r="2.5" fill="#60A8E8"/>
+  <circle cx="18" cy="18" r="2.5" fill="#60A8E8"/>
+
+  <!-- Signal arcs -->
+  <path d="M 21,11 Q 25,7 25,11 Q 25,15 21,11" fill="none" stroke="#60A8E8" stroke-width="1.5" stroke-linecap="round" opacity="0.95"/>
+  <path d="M 21,11 Q 28,4 28,11 Q 28,18 21,11" fill="none" stroke="#60A8E8" stroke-width="1" stroke-linecap="round" opacity="0.55"/>
+</svg>

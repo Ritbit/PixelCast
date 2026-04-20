@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+  <title>PixelCast Icon 48x48</title>
+  <rect width="48" height="48" rx="9" fill="#185FA5"/>
+  <!-- 5x5 grid, dot radius 2, spacing 6.5, start x=4, y=4 -->
+  <circle cx="4"  cy="4"  r="2" fill="#60A8E8"/>
+  <circle cx="11" cy="4"  r="2" fill="#60A8E8"/>
+  <circle cx="18" cy="4"  r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="25" cy="4"  r="2" fill="#60A8E8"/>
+  <circle cx="32" cy="4"  r="2" fill="#60A8E8"/>
+
+  <circle cx="4"  cy="11" r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="11" cy="11" r="2" fill="#60A8E8"/>
+  <circle cx="18" cy="11" r="2" fill="#60A8E8"/>
+  <circle cx="25" cy="11" r="2" fill="#60A8E8"/>
+  <circle cx="32" cy="11" r="2" fill="#1E6FAF" opacity="0.45"/>
+
+  <circle cx="4"  cy="18" r="2" fill="#60A8E8"/>
+  <circle cx="11" cy="18" r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="18" cy="18" r="2" fill="#60A8E8"/>
+  <circle cx="25" cy="18" r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="32" cy="18" r="2" fill="#60A8E8"/>
+
+  <circle cx="4"  cy="25" r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="11" cy="25" r="2" fill="#60A8E8"/>
+  <circle cx="18" cy="25" r="2" fill="#60A8E8"/>
+  <circle cx="25" cy="25" r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="32" cy="25" r="2" fill="#60A8E8"/>
+
+  <circle cx="4"  cy="32" r="2" fill="#60A8E8"/>
+  <circle cx="11" cy="32" r="2" fill="#60A8E8"/>
+  <circle cx="18" cy="32" r="2" fill="#1E6FAF" opacity="0.45"/>
+  <circle cx="25" cy="32" r="2" fill="#60A8E8"/>
+  <circle cx="32" cy="32" r="2" fill="#60A8E8"/>
+
+  <!-- Signal arcs -->
+  <path d="M 34,18 Q 38,13 38,18 Q 38,23 34,18" fill="none" stroke="#60A8E8" stroke-width="1.5" stroke-linecap="round" opacity="0.95"/>
+  <path d="M 34,18 Q 40,10 40,18 Q 40,26 34,18" fill="none" stroke="#60A8E8" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  <path d="M 34,18 Q 44,5  44,18 Q 44,31 34,18" fill="none" stroke="#60A8E8" stroke-width="0.8" stroke-linecap="round" opacity="0.35"/>
+</svg>

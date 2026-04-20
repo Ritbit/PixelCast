@@ -1,0 +1,270 @@
+{% extends 'base.html' %}
+{% block title %}System Stats — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+}
+.stat-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); margin-bottom: 12px;
+}
+.big-num {
+  font-size: 36px; font-weight: 700; line-height: 1;
+}
+.unit { font-size: 16px; color: var(--muted); margin-left: 4px; }
+
+/* Bar gauge */
+.gauge-wrap { margin-top: 10px; }
+.gauge-label { display:flex; justify-content:space-between;
+               font-size:12px; color:var(--muted); margin-bottom:4px; }
+.gauge-track { height: 8px; background: var(--border);
+               border-radius: 4px; overflow: hidden; }
+.gauge-fill  { height: 100%; border-radius: 4px;
+               transition: width .5s ease; }
+.gauge-ok     { background: var(--green); }
+.gauge-warn   { background: var(--accent2); }
+.gauge-danger { background: var(--red); }
+
+/* Sparkline canvas */
+.spark-wrap { margin-top: 12px; }
+canvas.spark {
+  width: 100%; height: 60px;
+  display: block; border-radius: 4px;
+}
+
+.disk-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.disk-row:last-child { border: none; }
+.disk-label { min-width: 80px; font-size: 13px; font-weight: 600; }
+.disk-track { flex: 1; }
+.disk-nums { text-align: right; font-size: 12px; color: var(--muted);
+             min-width: 100px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 class="page-title" style="margin:0;">System Statistics</h1>
+  <span class="text-muted" style="font-size:12px;" id="last-update">—</span>
+</div>
+
+<div class="grid-2">
+
+  <!-- CPU -->
+  <div class="stat-card">
+    <div class="stat-title">CPU Usage</div>
+    <div>
+      <span class="big-num" id="cpu-val">—</span>
+      <span class="unit">%</span>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-track">
+        <div class="gauge-fill gauge-ok" id="cpu-bar" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="spark-wrap">
+      <canvas class="spark" id="cpu-spark"></canvas>
+    </div>
+  </div>
+
+  <!-- CPU Temperature -->
+  <div class="stat-card">
+    <div class="stat-title">CPU Temperature</div>
+    <div>
+      <span class="big-num" id="temp-val">—</span>
+      <span class="unit">°C</span>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-label">
+        <span>0°C</span><span>50°C</span><span>85°C</span>
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-fill gauge-ok" id="temp-bar" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="spark-wrap">
+      <canvas class="spark" id="temp-spark"></canvas>
+    </div>
+  </div>
+
+  <!-- Memory -->
+  <div class="stat-card">
+    <div class="stat-title">Memory</div>
+    <div>
+      <span class="big-num" id="mem-used">—</span>
+      <span class="unit">MB</span>
+      <span class="text-muted" style="font-size:13px; margin-left:8px;">
+        of <span id="mem-total">—</span> MB
+      </span>
+    </div>
+    <div class="gauge-wrap">
+      <div class="gauge-label">
+        <span>Used: <span id="mem-pct">—</span>%</span>
+        <span>Free: <span id="mem-free">—</span> MB</span>
+      </div>
+      <div class="gauge-track">
+        <div class="gauge-fill gauge-ok" id="mem-bar" style="width:0%"></div>
+      </div>
+    </div>
+    <div class="spark-wrap">
+      <canvas class="spark" id="mem-spark"></canvas>
+    </div>
+  </div>
+
+  <!-- Uptime -->
+  <div class="stat-card">
+    <div class="stat-title">Daemon Uptime</div>
+    <div class="big-num" id="uptime-val" style="font-size:24px;">—</div>
+    <div style="margin-top:16px;">
+      <div class="stat-title" style="margin-bottom:8px;">Storage</div>
+      <div id="disk-list">
+        <div class="text-muted" style="font-size:12px;">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Circular buffer for sparklines
+const HISTORY = 60;
+const history = { cpu: [], temp: [], mem: [] };
+
+function gaugeClass(pct, warn=70, danger=90) {
+  if (pct >= danger) return 'gauge-danger';
+  if (pct >= warn)   return 'gauge-warn';
+  return 'gauge-ok';
+}
+
+function fmtUptime(s) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = Math.floor(s % 60);
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function drawSpark(canvasId, data, color, minVal=0, maxVal=100) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx  = canvas.getContext('2d');
+  const dpr  = window.devicePixelRatio || 1;
+  const w    = canvas.offsetWidth  * dpr;
+  const h    = canvas.offsetHeight * dpr;
+  canvas.width  = w;
+  canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+  if (data.length < 2) return;
+
+  const range = maxVal - minVal || 1;
+  const step  = w / (HISTORY - 1);
+
+  // Fill
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = h - ((v - minVal) / range) * h * 0.9;
+    i === 0 ? ctx.lineTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo((data.length - 1) * step, h);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color + '55');
+  grad.addColorStop(1, color + '05');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = i * step;
+    const y = h - ((v - minVal) / range) * h * 0.9;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5 * dpr;
+  ctx.stroke();
+}
+
+function pushHistory(key, val) {
+  history[key].push(val);
+  if (history[key].length > HISTORY) history[key].shift();
+}
+
+function updateDiskList(disks) {
+  const el = document.getElementById('disk-list');
+  el.innerHTML = disks.map(d => {
+    const cls = gaugeClass(d.percent);
+    return `
+    <div class="disk-row">
+      <div class="disk-label">${d.label}</div>
+      <div class="disk-track">
+        <div class="gauge-track">
+          <div class="gauge-fill ${cls}" style="width:${d.percent}%"></div>
+        </div>
+      </div>
+      <div class="disk-nums">${d.used_gb}/${d.total_gb} GB</div>
+    </div>`;
+  }).join('');
+}
+
+function fetchStats() {
+  fetch('/system/stats/data')
+    .then(r => r.json())
+    .then(d => {
+      // CPU
+      pushHistory('cpu', d.cpu);
+      document.getElementById('cpu-val').textContent = d.cpu;
+      const cpuBar = document.getElementById('cpu-bar');
+      cpuBar.style.width    = d.cpu + '%';
+      cpuBar.className = `gauge-fill ${gaugeClass(d.cpu)}`;
+      drawSpark('cpu-spark', history.cpu, '#4f8ef7');
+
+      // Temp
+      pushHistory('temp', d.temp);
+      document.getElementById('temp-val').textContent = d.temp;
+      const tPct   = Math.min(100, d.temp / 85 * 100);
+      const tempBar = document.getElementById('temp-bar');
+      tempBar.style.width  = tPct + '%';
+      tempBar.className = `gauge-fill ${gaugeClass(tPct, 65, 80)}`;
+      drawSpark('temp-spark', history.temp, '#f7914f', 20, 85);
+
+      // Memory
+      const m = d.memory;
+      pushHistory('mem', m.percent);
+      document.getElementById('mem-used').textContent  = m.used_mb;
+      document.getElementById('mem-total').textContent = m.total_mb;
+      document.getElementById('mem-free').textContent  = m.free_mb;
+      document.getElementById('mem-pct').textContent   = m.percent;
+      const memBar = document.getElementById('mem-bar');
+      memBar.style.width    = m.percent + '%';
+      memBar.className = `gauge-fill ${gaugeClass(m.percent)}`;
+      drawSpark('mem-spark', history.mem, '#4fca6e');
+
+      // Uptime
+      document.getElementById('uptime-val').textContent = fmtUptime(d.uptime_s);
+
+      // Disks
+      updateDiskList(d.disks);
+
+      document.getElementById('last-update').textContent =
+        'Updated ' + new Date().toLocaleTimeString();
+    })
+    .catch(() => {
+      document.getElementById('last-update').textContent = 'Error fetching stats';
+    });
+}
+
+fetchStats();
+setInterval(fetchStats, 5000);
+</script>
+{% endblock %}

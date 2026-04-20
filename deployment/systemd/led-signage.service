@@ -1,0 +1,21 @@
+[Unit]
+Description=LED Matrix Signage Daemon
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/led-signage
+ExecStart=/usr/bin/python3 /root/led-signage/daemon.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=led-signage
+
+# Give GPIO time to settle after boot
+ExecStartPre=/bin/sleep 3
+
+[Install]
+WantedBy=multi-user.target

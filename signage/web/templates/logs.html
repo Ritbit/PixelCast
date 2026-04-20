@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block title %}Logs — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+#log-container {
+  background: #0a0c12; border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 16px;
+  height: 520px; overflow-y: auto;
+  font-family: 'Courier New', monospace; font-size: 12px;
+  line-height: 1.6;
+}
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-error   { color: #f77; }
+.log-warning { color: #fa3; }
+.log-info    { color: #cdd; }
+.log-debug   { color: #678; }
+.log-default { color: #aaa; }
+.controls { display:flex; gap:12px; align-items:center;
+            margin-bottom:12px; flex-wrap:wrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 class="page-title" style="margin:0;">System Logs</h1>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <span class="text-muted" style="font-size:12px;" id="log-status">Loading…</span>
+    <button class="btn btn-sm btn-secondary" onclick="scrollBottom()">⬇ Bottom</button>
+    <button class="btn btn-sm btn-secondary" onclick="clearLog()">🗑 Clear</button>
+  </div>
+</div>
+
+<div class="card" style="padding:16px;">
+  <div class="controls">
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+      <input type="checkbox" id="auto-refresh" checked> Auto-refresh
+    </label>
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+      Lines:
+      <select id="line-count" style="width:80px;">
+        <option value="50">50</option>
+        <option value="100">100</option>
+        <option value="200" selected>200</option>
+        <option value="500">500</option>
+        <option value="1000">1000</option>
+      </select>
+    </label>
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+      Filter:
+      <input type="text" id="filter-input" placeholder="e.g. ERROR or renderer"
+             style="width:180px;"
+             oninput="applyFilter()">
+    </label>
+    <label style="display:flex; align-items:center; gap:6px; font-size:13px;">
+      <input type="checkbox" id="scroll-lock"> Scroll lock
+    </label>
+  </div>
+  <div id="log-container"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allLines   = [];
+let refreshTimer = null;
+
+function fetchLogs() {
+  const n = document.getElementById('line-count').value;
+  fetch(`/system/logs/data?lines=${n}`)
+    .then(r => r.json())
+    .then(data => {
+      allLines = data.lines || [];
+      const now = new Date().toLocaleTimeString();
+      document.getElementById('log-status').textContent =
+        `${allLines.length} lines — updated ${now}`;
+      applyFilter();
+    })
+    .catch(() => {
+      document.getElementById('log-status').textContent = 'Error fetching logs';
+    });
+}
+
+function applyFilter() {
+  const filter = document.getElementById('filter-input').value.toLowerCase();
+  const box    = document.getElementById('log-container');
+  const locked = document.getElementById('scroll-lock').checked;
+  const wasAtBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+
+  const filtered = filter
+    ? allLines.filter(l => l.toLowerCase().includes(filter))
+    : allLines;
+
+  box.innerHTML = filtered.map(line => {
+    const lower = line.toLowerCase();
+    let cls = 'log-default';
+    if (lower.includes(' error') || lower.includes('[error]'))   cls = 'log-error';
+    else if (lower.includes(' warn')  || lower.includes('[warn]'))  cls = 'log-warning';
+    else if (lower.includes(' info')  || lower.includes('[info]'))  cls = 'log-info';
+    else if (lower.includes(' debug') || lower.includes('[debug]')) cls = 'log-debug';
+    const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    return `<div class="log-line ${cls}">${esc}</div>`;
+  }).join('');
+
+  if (!locked && wasAtBottom) scrollBottom();
+}
+
+function scrollBottom() {
+  const box = document.getElementById('log-container');
+  box.scrollTop = box.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('log-container').innerHTML = '';
+  allLines = [];
+}
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  if (document.getElementById('auto-refresh').checked) {
+    refreshTimer = setTimeout(() => { fetchLogs(); scheduleRefresh(); }, 5000);
+  }
+}
+
+document.getElementById('auto-refresh').addEventListener('change', () => {
+  scheduleRefresh();
+});
+document.getElementById('line-count').addEventListener('change', fetchLogs);
+
+// Initial load
+fetchLogs();
+scheduleRefresh();
+</script>
+{% endblock %}

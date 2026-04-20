@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Error {{ code }} — LED Signage{% endblock %}
+{% block content %}
+<div style="text-align:center; padding:80px 20px;">
+  <div style="font-size:64px; margin-bottom:16px;">
+    {% if code == 404 %}🔍
+    {% elif code == 500 %}⚠️
+    {% elif code == 403 %}🔒
+    {% else %}❌{% endif %}
+  </div>
+  <h1 style="font-size:28px; margin-bottom:8px;">{{ code }}</h1>
+  <p style="color:var(--muted); margin-bottom:24px;">{{ message }}</p>
+  {% if detail %}
+  <div class="card" style="max-width:600px; margin:0 auto 24px; text-align:left;">
+    <div class="card-title">Details</div>
+    <pre style="font-size:12px; color:var(--muted); white-space:pre-wrap; word-break:break-all;">{{ detail }}</pre>
+  </div>
+  {% endif %}
+  <a href="{{ url_for('main.index') }}" class="btn btn-primary">← Back to Dashboard</a>
+</div>
+{% endblock %}

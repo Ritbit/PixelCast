@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+{% block title %}Screen Test — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+.test-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.test-btn {
+  padding: 14px 8px; border-radius: 8px; border: 2px solid var(--border);
+  background: var(--surface); cursor: pointer; text-align: center;
+  font-size: 13px; font-weight: 600; transition: border-color .15s, transform .1s;
+  color: var(--text);
+}
+.test-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+.test-btn.active { border-color: var(--accent); background: rgba(79,142,247,.12); }
+.test-btn .swatch {
+  width: 100%; height: 36px; border-radius: 4px; margin-bottom: 8px;
+  border: 1px solid rgba(255,255,255,.1);
+}
+.fade-bar {
+  height: 16px; border-radius: 4px; margin-bottom: 8px;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Screen Test</h1>
+
+<div class="card">
+  <div class="card-title">Solid Colors</div>
+  <div class="test-grid">
+    <div class="test-btn" onclick="sendTest('solid','#ff0000')">
+      <div class="swatch" style="background:#f00;"></div>Red
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#00ff00')">
+      <div class="swatch" style="background:#0f0;"></div>Green
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#0000ff')">
+      <div class="swatch" style="background:#00f;"></div>Blue
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#ffff00')">
+      <div class="swatch" style="background:#ff0;"></div>Red+Green
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#00ffff')">
+      <div class="swatch" style="background:#0ff;"></div>Green+Blue
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#ff00ff')">
+      <div class="swatch" style="background:#f0f;"></div>Red+Blue
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#ffffff')">
+      <div class="swatch" style="background:#fff;"></div>White
+    </div>
+    <div class="test-btn" onclick="sendTest('solid','#000000')">
+      <div class="swatch" style="background:#111; border:1px solid #333;"></div>Black (off)
+    </div>
+    <div class="test-btn">
+      <label style="cursor:pointer;">
+        <div class="swatch" id="custom-swatch" style="background:#ff8800;"></div>
+        Custom
+        <input type="color" id="custom-color" value="#ff8800"
+               style="position:absolute;opacity:0;width:1px;"
+               oninput="document.getElementById('custom-swatch').style.background=this.value">
+        <button class="btn btn-sm btn-primary" style="margin-top:4px;"
+                onclick="sendTest('solid',document.getElementById('custom-color').value);event.stopPropagation()">Send</button>
+      </label>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Test Patterns</div>
+  <div class="test-grid">
+    <div class="test-btn" onclick="sendTest('pattern','gradient_h')">
+      <div class="swatch" style="background:linear-gradient(to right,#000,#fff);"></div>H Gradient
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','gradient_v')">
+      <div class="swatch" style="background:linear-gradient(to bottom,#000,#fff);"></div>V Gradient
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','rainbow_h')">
+      <div class="swatch" style="background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f);"></div>Rainbow H
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','checkerboard')">
+      <div class="swatch" style="background: repeating-conic-gradient(#555 0% 25%, #222 0% 50%) 0 0/12px 12px;"></div>Checkerboard
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','grid')">
+      <div class="swatch" style="background:#111; background-image: linear-gradient(#444 1px,transparent 1px),linear-gradient(90deg,#444 1px,transparent 1px); background-size:12px 6px;"></div>Grid
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','crosshair')">
+      <div class="swatch" style="background:#111; position:relative;">
+        <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:#0f0;"></div>
+        <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:#0f0;"></div>
+      </div>Crosshair
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','border')">
+      <div class="swatch" style="background:#111;border:3px solid #0f0;box-sizing:border-box;"></div>Border
+    </div>
+    <div class="test-btn" onclick="sendTest('pattern','pixels')">
+      <div class="swatch" style="background:repeating-linear-gradient(45deg,#f00 0,#f00 2px,#0f0 2px,#0f0 4px,#00f 4px,#00f 6px);"></div>RGB Pixels
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Animated Tests</div>
+  <div class="test-grid">
+    <div class="test-btn" onclick="sendTest('anim','color_fade')">
+      <div class="fade-bar"></div>Color Fade
+    </div>
+    <div class="test-btn" onclick="sendTest('anim','brightness_ramp')">
+      <div class="swatch" style="background:linear-gradient(to right,#000,#fff);"></div>Brightness Ramp
+    </div>
+    <div class="test-btn" onclick="sendTest('anim','flash_rgb')">
+      <div class="swatch" style="background:linear-gradient(135deg,#f00 33%,#0f0 33% 66%,#00f 66%);"></div>Flash RGB
+    </div>
+    <div class="test-btn" onclick="sendTest('anim','scan_h')">
+      <div class="swatch" style="background:#111; position:relative; overflow:hidden;">
+        <div style="position:absolute;left:0;right:0;top:40%;height:2px;background:#fff;"></div>
+      </div>H Scan Line
+    </div>
+    <div class="test-btn" onclick="sendTest('anim','scan_v')">
+      <div class="swatch" style="background:#111; position:relative; overflow:hidden;">
+        <div style="position:absolute;top:0;bottom:0;left:45%;width:2px;background:#fff;"></div>
+      </div>V Scan Line
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Duration &amp; Control</div>
+  <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:8px; font-size:13px;">
+      Duration:
+      <select id="test-duration">
+        <option value="5">5 seconds</option>
+        <option value="10" selected>10 seconds</option>
+        <option value="30">30 seconds</option>
+        <option value="60">1 minute</option>
+        <option value="0">Until stopped</option>
+      </select>
+    </label>
+    <button class="btn btn-danger" onclick="stopTest()">⏹ Stop Test / Resume Playlist</button>
+    <span id="test-status" class="text-muted" style="font-size:12px;"></span>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let testTimer = null;
+
+function sendTest(type, param) {
+  document.querySelectorAll('.test-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  const dur = parseInt(document.getElementById('test-duration').value);
+  const status = document.getElementById('test-status');
+  status.textContent = 'Sending…';
+
+  fetch('/control/screentest', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({type, param, duration: dur})
+  })
+  .then(r => r.json())
+  .then(d => {
+    status.textContent = d.ok ? `Running ${param}…` : ('Error: ' + d.message);
+    if (dur > 0) {
+      clearTimeout(testTimer);
+      testTimer = setTimeout(() => {
+        status.textContent = 'Test complete — playlist resumed';
+        document.querySelectorAll('.test-btn').forEach(b => b.classList.remove('active'));
+      }, dur * 1000);
+    }
+  })
+  .catch(() => { status.textContent = 'Error sending test'; });
+}
+
+function stopTest() {
+  fetch('/control/screentest/stop', {method:'POST'})
+    .then(() => {
+      document.getElementById('test-status').textContent = 'Playlist resumed';
+      document.querySelectorAll('.test-btn').forEach(b => b.classList.remove('active'));
+      clearTimeout(testTimer);
+    });
+}
+</script>
+{% endblock %}

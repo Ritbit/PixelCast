@@ -1,0 +1,543 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+/* Two-column dashboard layout */
+.dashboard {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .dashboard { grid-template-columns: 1fr; }
+}
+
+/* Preview */
+.preview-wrap {
+  position: relative; background: #000;
+  border-radius: 6px; overflow: hidden;
+  border: 1px solid var(--border);
+  width: 100%; aspect-ratio: 2 / 1;
+}
+.preview-wrap img {
+  display: block; width: 100%; height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.preview-label {
+  position: absolute; bottom: 6px; right: 8px;
+  background: rgba(0,0,0,.65); color: #aaa;
+  font-size: 10px; padding: 2px 6px; border-radius: 3px;
+  font-family: monospace; pointer-events: none;
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green); box-shadow: 0 0 5px var(--green);
+  display: inline-block; animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* Gauge */
+.gauge-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 0; border-bottom: 1px solid var(--border);
+}
+.gauge-row:last-child { border: none; }
+.gauge-label { font-size: 12px; color: var(--muted); width: 90px; flex-shrink: 0; }
+.gauge-value { font-size: 13px; font-weight: 600; width: 56px;
+               flex-shrink: 0; text-align: right; }
+.gauge-track { flex: 1; height: 6px; background: var(--border);
+               border-radius: 3px; overflow: hidden; }
+.gauge-fill  { height: 100%; border-radius: 3px; transition: width .5s; }
+.g-ok     { background: var(--green); }
+.g-warn   { background: var(--accent2); }
+.g-danger { background: var(--red); }
+.g-blue   { background: var(--accent); }
+.g-temp   { background: #f7914f; }
+
+/* Sparkline */
+canvas.spark {
+  display: block; width: 100%; height: 40px;
+  border-radius: 4px; margin-top: 4px;
+}
+
+/* Playlist table */
+.playlist-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.playlist-table th {
+  color: var(--muted); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .05em; padding: 8px 10px; text-align: left;
+  border-bottom: 1px solid var(--border); font-weight: 600;
+}
+.playlist-table td {
+  padding: 9px 10px; border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.playlist-table tr:last-child td { border: none; }
+.playlist-table tr.active-row td {
+  background: rgba(79,142,247,.10);
+}
+.playlist-table tr.active-row td:first-child {
+  border-left: 3px solid var(--accent);
+  padding-left: 7px;
+}
+.now-badge {
+  display: inline-block; background: var(--accent);
+  color: #fff; font-size: 10px; font-weight: 700;
+  padding: 1px 6px; border-radius: 10px;
+  vertical-align: middle; margin-left: 6px;
+  animation: pulse 2s infinite;
+}
+.inactive-row { opacity: 0.55; }
+.date-badge {
+  font-size: 10px; color: var(--muted);
+  background: var(--surface); padding: 1px 5px;
+  border-radius: 3px; white-space: nowrap;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+
+<div class="dashboard">
+
+  <!-- ================================================================ -->
+  <!-- LEFT COLUMN                                                       -->
+  <!-- ================================================================ -->
+  <div>
+
+    <!-- Live preview -->
+    <div class="card" style="padding:14px; margin-bottom:14px;">
+      <div class="card-title" style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+        <span class="live-dot" id="live-dot"></span>
+        Live Preview
+        <span style="margin-left:auto; font-size:11px; color:var(--muted);">
+          {{ status.resolution }}
+        </span>
+      </div>
+
+      <div class="preview-wrap" id="preview-wrap">
+        <img id="preview-img"
+             src="/control/stream?fps=10&scale=4"
+             alt="Live preview" onerror="previewError()">
+        <div class="preview-label" id="fps-label">10 fps</div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:14px; margin-top:8px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:5px;
+                      font-size:12px; color:var(--muted); cursor:pointer;">
+          <input type="range" id="fps-slider" min="1" max="20" value="10"
+                 style="width:70px;" oninput="updateFps(this.value)">
+          <span id="fps-val">10</span> fps
+        </label>
+        <label style="display:flex; align-items:center; gap:5px;
+                      font-size:12px; color:var(--muted); cursor:pointer;">
+          <input type="checkbox" id="preview-on" checked
+                 onchange="togglePreview()">
+          Live
+        </label>
+      </div>
+    </div>
+
+    <!-- Brightness -->
+    <div class="card" style="padding:14px; margin-bottom:14px;">
+      <div class="card-title">Brightness</div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <input type="range" min="1" max="100" id="bri-slider"
+               value="{{ status.brightness }}" style="flex:1;"
+               oninput="updateBrightness(this.value)">
+        <span id="bri-val" style="font-weight:600; min-width:36px; text-align:right;">
+          {{ status.brightness }}%
+        </span>
+      </div>
+    </div>
+
+    <!-- System stats -->
+    <div class="card" style="padding:14px;">
+      <div class="card-title" style="margin-bottom:10px;">System</div>
+
+      <div class="gauge-row">
+        <span class="gauge-label">CPU</span>
+        <div class="gauge-track">
+          <div class="gauge-fill g-blue" id="s-cpu-bar" style="width:0%"></div>
+        </div>
+        <span class="gauge-value" id="s-cpu-val">—%</span>
+      </div>
+      <canvas class="spark" id="s-cpu-spark"></canvas>
+
+      <div class="gauge-row" style="margin-top:10px;">
+        <span class="gauge-label">Temperature</span>
+        <div class="gauge-track">
+          <div class="gauge-fill g-temp" id="s-temp-bar" style="width:0%"></div>
+        </div>
+        <span class="gauge-value" id="s-temp-val">—°C</span>
+      </div>
+      <canvas class="spark" id="s-temp-spark"></canvas>
+
+      <div class="gauge-row" style="margin-top:10px;">
+        <span class="gauge-label">Memory</span>
+        <div class="gauge-track">
+          <div class="gauge-fill g-ok" id="s-mem-bar" style="width:0%"></div>
+        </div>
+        <span class="gauge-value" id="s-mem-val">—%</span>
+      </div>
+      <canvas class="spark" id="s-mem-spark"></canvas>
+
+      <div id="s-disks" style="margin-top:10px;"></div>
+
+      <div style="margin-top:10px; font-size:11px; color:var(--muted);
+                  display:flex; justify-content:space-between;">
+        <span>Uptime: <span id="s-uptime">—</span></span>
+        <span id="s-updated">—</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- RIGHT COLUMN — Playlist                                          -->
+  <!-- ================================================================ -->
+  <div class="card" style="padding:16px;">
+    <div style="margin-bottom:2px;">
+      <div class="card-title" style="margin:0;">
+        Playlist
+        <span class="text-muted" style="font-weight:400; font-size:12px; margin-left:6px;">
+          {{ playlist | length }} items
+        </span>
+      </div>
+    </div>
+
+    <!-- Playback control bar inside playlist panel -->
+    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+                margin-bottom:14px; padding-bottom:14px;
+                border-bottom:1px solid var(--border);">
+
+      <!-- Status indicator -->
+      <div style="display:flex; align-items:center; gap:7px; margin-right:4px;">
+        <span class="status-dot {{ 'paused' if status.paused else 'playing' }}"
+              id="status-dot"></span>
+        <span style="font-size:13px; font-weight:600;" id="status-text">
+          {{ 'Paused' if status.paused else 'Playing' }}
+        </span>
+      </div>
+
+      <!-- Playback controls -->
+      <button class="btn btn-sm btn-secondary" title="Previous item"
+              onclick="doControl('/control/prev')">⏮</button>
+      <button class="btn btn-sm btn-secondary" id="pause-btn"
+              onclick="doControl('/control/pause')"
+              title="{{ 'Resume' if status.paused else 'Pause' }}">
+        {{ '▶' if status.paused else '⏸' }}
+      </button>
+      <button class="btn btn-sm btn-secondary" title="Skip to next item"
+              onclick="doControl('/control/skip')">⏭</button>
+      <button class="btn btn-sm btn-secondary" title="Restart current item"
+              onclick="doControl('/control/restart_item')">↺</button>
+
+      <!-- Separator -->
+      <div style="width:1px; height:24px; background:var(--border);
+                  margin:0 4px;"></div>
+
+      <!-- System controls -->
+      <button class="btn btn-sm btn-secondary" title="Restart daemon"
+              onclick="sysAction('/control/restart_daemon',
+                'Restart the signage daemon? Display goes dark briefly.')">
+        🔄
+      </button>
+      <button class="btn btn-sm btn-danger" title="Shut down Pi"
+              onclick="sysAction('/control/poweroff',
+                'Shut down the Raspberry Pi?')">
+        ⏻
+      </button>
+
+      <!-- Edit link pushed right -->
+      <a href="{{ url_for('playlist.index') }}"
+         class="btn btn-sm btn-secondary" style="margin-left:auto;"
+         title="Edit playlist">✏️ Edit</a>
+    </div>
+
+    {% if playlist %}
+    <table class="playlist-table" id="playlist-table">
+      <thead>
+        <tr>
+          <th style="width:32px;">#</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Duration</th>
+          <th>Transitions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in playlist %}
+        <tr class="playlist-row
+            {% if status.current and status.current.get('id') == item.id %}
+              active-row
+            {% endif %}"
+            data-id="{{ item.id }}">
+          <td class="text-muted">{{ loop.index }}</td>
+          <td>
+            <strong>{{ item.get('name','—') }}</strong>
+            {% if status.current and status.current.get('id') == item.id %}
+              <span class="now-badge">NOW</span>
+            {% endif %}
+            {% if item.get('date_from') or item.get('date_to') %}
+              <div class="date-badge" style="margin-top:2px;">
+                {% if item.get('date_from') %}from {{ item.date_from[:10] }}{% endif %}
+                {% if item.get('date_to') %} → {{ item.date_to[:10] }}{% endif %}
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge badge-{{ item.type }}">{{ item.type }}</span>
+          </td>
+          <td style="color:var(--muted);">{{ item.get('duration',10) }}s</td>
+          <td style="font-size:11px; color:var(--muted);">
+            {{ item.get('wipe_in','—') }}<br>
+            <span style="opacity:.6;">→ {{ item.get('wipe_out','—') }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center; padding:40px 0; color:var(--muted);">
+      <div style="font-size:32px; margin-bottom:8px;">📋</div>
+      No items in playlist.
+      <a href="{{ url_for('playlist.index') }}">Add some →</a>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ---- Preview ----
+let previewActive = true;
+
+function reconnectStream(fps) {
+  const wrap   = document.getElementById('preview-wrap');
+  const old    = document.getElementById('preview-img');
+  if (old) old.remove();
+  const img    = document.createElement('img');
+  img.id       = 'preview-img';
+  img.alt      = 'Live preview';
+  img.onerror  = previewError;
+  img.src      = `/control/stream?fps=${fps}&scale=4&t=${Date.now()}`;
+  wrap.insertBefore(img, wrap.querySelector('.preview-label'));
+}
+
+function updateFps(val) {
+  document.getElementById('fps-val').textContent   = val;
+  document.getElementById('fps-label').textContent = val + ' fps';
+  if (previewActive) reconnectStream(val);
+}
+
+function togglePreview() {
+  previewActive = document.getElementById('preview-on').checked;
+  const dot = document.getElementById('live-dot');
+  if (previewActive) {
+    reconnectStream(document.getElementById('fps-slider').value);
+    dot.style.animationPlayState = 'running';
+    dot.style.background = 'var(--green)';
+    dot.style.boxShadow  = '0 0 5px var(--green)';
+  } else {
+    const wrap = document.getElementById('preview-wrap');
+    const old  = document.getElementById('preview-img');
+    if (old) old.remove();
+    const img  = document.createElement('img');
+    img.id     = 'preview-img';
+    img.alt    = 'Snapshot';
+    img.src    = `/control/snapshot?scale=4&t=${Date.now()}`;
+    wrap.insertBefore(img, wrap.querySelector('.preview-label'));
+    dot.style.animationPlayState = 'paused';
+    dot.style.background = 'var(--muted)';
+    dot.style.boxShadow  = 'none';
+  }
+}
+
+function previewError() {
+  previewActive = false;
+  document.getElementById('preview-on').checked = false;
+  togglePreview();
+}
+
+// ---- Brightness ----
+let briTimer = null;
+function updateBrightness(val) {
+  document.getElementById('bri-val').textContent = val + '%';
+  clearTimeout(briTimer);
+  briTimer = setTimeout(() => {
+    fetch('/control/brightness', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({value: parseInt(val)})
+    });
+  }, 300);
+}
+
+// ---- Control buttons ----
+function doControl(url) {
+  fetch(url, {method: 'POST'}).then(r => r.json()).then(() => {
+    if (url.includes('pause')) refreshStatus();
+  });
+}
+
+// ---- Status polling ----
+function refreshStatus() {
+  fetch('/control/status').then(r => r.json()).then(s => {
+    // Status dot + text
+    const dot = document.getElementById('status-dot');
+    dot.className = 'status-dot ' + (s.paused ? 'paused' : 'playing');
+    document.getElementById('status-text').textContent =
+      s.paused ? 'Paused' : 'Playing';
+    document.getElementById('pause-btn').textContent =
+      s.paused ? '▶' : '⏸';
+    document.getElementById('pause-btn').title =
+      s.paused ? 'Resume' : 'Pause';
+
+    // Brightness (if changed externally e.g. by scheduler)
+    const slider = document.getElementById('bri-slider');
+    if (document.activeElement !== slider) {
+      slider.value = s.brightness;
+      document.getElementById('bri-val').textContent = s.brightness + '%';
+    }
+
+    // Highlight active playlist row
+    document.querySelectorAll('.playlist-row').forEach(row => {
+      const isActive = s.current && row.dataset.id === s.current.id;
+      row.classList.toggle('active-row', isActive);
+      row.classList.toggle('inactive-row', false);
+      // Update NOW badge
+      const badge = row.querySelector('.now-badge');
+      if (isActive && !badge) {
+        const td = row.querySelector('td:nth-child(2) strong');
+        if (td) {
+          const b = document.createElement('span');
+          b.className = 'now-badge';
+          b.textContent = 'NOW';
+          td.after(b);
+        }
+      } else if (!isActive && badge) {
+        badge.remove();
+      }
+      // Scroll active row into view
+      if (isActive) {
+        row.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      }
+    });
+  });
+}
+
+setInterval(refreshStatus, 3000);
+
+// ---- System stats sparklines ----
+const HIST = 60;
+const hist = {cpu: [], temp: [], mem: []};
+
+function push(key, val) {
+  hist[key].push(val);
+  if (hist[key].length > HIST) hist[key].shift();
+}
+
+function gClass(pct, w=70, d=90) {
+  return pct >= d ? 'g-danger' : pct >= w ? 'g-warn' : 'g-ok';
+}
+
+function setBar(id, pct, cls) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.width = pct + '%';
+  el.className   = 'gauge-fill ' + cls;
+}
+
+function drawSpark(id, data, color, lo=0, hi=100) {
+  const c = document.getElementById(id);
+  if (!c || data.length < 2) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w   = c.offsetWidth * dpr, h = c.offsetHeight * dpr;
+  c.width = w; c.height = h;
+  const ctx   = c.getContext('2d');
+  const range = (hi - lo) || 1;
+  const step  = w / (HIST - 1);
+  ctx.clearRect(0, 0, w, h);
+
+  ctx.beginPath();
+  ctx.moveTo(0, h);
+  data.forEach((v, i) => ctx.lineTo(i * step, h - ((v-lo)/range)*h*.85));
+  ctx.lineTo((data.length-1)*step, h);
+  ctx.closePath();
+  const g = ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0, color+'44'); g.addColorStop(1, color+'05');
+  ctx.fillStyle = g; ctx.fill();
+
+  ctx.beginPath();
+  data.forEach((v,i)=>i?ctx.lineTo(i*step,h-((v-lo)/range)*h*.85)
+                       :ctx.moveTo(0,h-((v-lo)/range)*h*.85));
+  ctx.strokeStyle=color; ctx.lineWidth=1.5*dpr; ctx.stroke();
+}
+
+function fmtUptime(s) {
+  const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=Math.floor(s%60);
+  return h>0?`${h}h ${m}m`:m>0?`${m}m ${sec}s`:`${sec}s`;
+}
+
+function fetchStats() {
+  fetch('/system/stats/data').then(r => r.json()).then(d => {
+    // CPU
+    push('cpu', d.cpu);
+    document.getElementById('s-cpu-val').textContent = d.cpu + '%';
+    setBar('s-cpu-bar', d.cpu, 'g-blue');
+    drawSpark('s-cpu-spark', hist.cpu, '#4f8ef7');
+
+    // Temp
+    push('temp', d.temp);
+    document.getElementById('s-temp-val').textContent = d.temp + '°C';
+    const tpct = Math.min(100, d.temp/85*100);
+    setBar('s-temp-bar', tpct, 'g-temp');
+    drawSpark('s-temp-spark', hist.temp, '#f7914f', 20, 85);
+
+    // Memory
+    const m = d.memory;
+    push('mem', m.percent);
+    document.getElementById('s-mem-val').textContent = m.percent + '%';
+    setBar('s-mem-bar', m.percent, gClass(m.percent));
+    drawSpark('s-mem-spark', hist.mem, '#4fca6e');
+
+    // Disks
+    const diskEl = document.getElementById('s-disks');
+    diskEl.innerHTML = d.disks.map(dk => `
+      <div style="margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;
+                    font-size:11px;color:var(--muted);margin-bottom:2px;">
+          <span>${dk.label}</span>
+          <span>${dk.used_gb}/${dk.total_gb}GB</span>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill ${gClass(dk.percent)}"
+               style="width:${dk.percent}%"></div>
+        </div>
+      </div>`).join('');
+
+    document.getElementById('s-uptime').textContent = fmtUptime(d.uptime_s);
+    document.getElementById('s-updated').textContent =
+      new Date().toLocaleTimeString();
+  }).catch(()=>{});
+}
+
+fetchStats();
+setInterval(fetchStats, 5000);
+
+// ---- System actions (restart/poweroff) ----
+function sysAction(url, msg) {
+  if (!confirm(msg)) return;
+  fetch(url, {method: 'POST'})
+    .then(r => r.json())
+    .catch(() => {});   // connection drop on restart is expected
+}
+</script>
+{% endblock %}

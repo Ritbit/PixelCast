@@ -1,0 +1,1095 @@
+{% extends 'base.html' %}
+{% block title %}Edit Item — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+.section-title {
+  font-size:11px; font-weight:600; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--muted); margin:16px 0 10px;
+  padding-bottom:6px; border-bottom:1px solid var(--border);
+}
+.hint { font-size:11px; color:var(--muted); margin-top:3px; }
+
+/* ── File picker modal ── */
+.fp-overlay {
+  display:none; position:fixed; inset:0; z-index:900;
+  background:rgba(0,0,0,.75); align-items:center; justify-content:center;
+}
+.fp-overlay.open { display:flex; }
+.fp-modal {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; width:min(820px,95vw); max-height:85vh;
+  display:flex; flex-direction:column; overflow:hidden;
+  box-shadow:0 8px 40px rgba(0,0,0,.6);
+}
+.fp-header {
+  padding:14px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.fp-header h3 { margin:0; font-size:15px; flex:1; }
+.fp-close {
+  background:none; border:none; color:var(--muted); font-size:20px;
+  cursor:pointer; padding:0 4px; line-height:1;
+}
+.fp-close:hover { color:var(--text); }
+.fp-grid {
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap:10px; padding:14px; overflow-y:auto; flex:1;
+}
+.fp-item {
+  background:var(--surface); border:2px solid var(--border);
+  border-radius:8px; overflow:hidden; cursor:pointer;
+  transition:border-color .15s, transform .1s;
+  display:flex; flex-direction:column;
+}
+.fp-item:hover { border-color:var(--accent); transform:translateY(-1px); }
+.fp-item.selected { border-color:var(--accent); background:rgba(79,142,247,.1); }
+.fp-thumb {
+  width:100%; aspect-ratio:16/9; background:var(--bg);
+  display:flex; align-items:center; justify-content:center;
+  font-size:28px; overflow:hidden;
+}
+.fp-thumb img { width:100%; height:100%; object-fit:cover; }
+.fp-name {
+  font-size:10px; padding:5px 6px; line-height:1.3;
+  word-break:break-all; color:var(--text); flex:1;
+}
+.fp-footer {
+  padding:12px 18px; border-top:1px solid var(--border);
+  display:flex; align-items:center; gap:10px; flex-shrink:0;
+}
+.fp-selected-name {
+  flex:1; font-size:13px; color:var(--muted); font-style:italic;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+/* Current file display box */
+.current-file-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:10px 12px;
+  display:flex; align-items:center; gap:12px; margin-bottom:8px;
+}
+.current-file-thumb {
+  width:80px; height:45px; flex-shrink:0; background:var(--bg);
+  border-radius:4px; overflow:hidden; display:flex;
+  align-items:center; justify-content:center; font-size:20px;
+}
+.current-file-thumb img { width:100%; height:100%; object-fit:cover; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+  <a href="{{ url_for('playlist.index') }}" class="btn btn-secondary">← Back</a>
+  <h1 class="page-title" style="margin:0;">Edit: {{ item.get('name','Item') }}</h1>
+  <span class="badge badge-{{ item.type }}">{{ item.type }}</span>
+</div>
+
+<form method="post">
+  <input type="hidden" name="type" value="{{ item.type }}">
+
+  <!-- ── General ── -->
+  <div class="card">
+    <div class="card-title">General</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Item Name</label>
+        <input type="text" name="name" value="{{ item.get('name','') }}" required>
+      </div>
+      <div class="form-group">
+        <label>Duration</label>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input type="number" name="duration" id="duration-input"
+                 value="{{ item.get('duration',10) if item.get('duration') != 'auto' else '' }}"
+                 min="1" style="flex:1;"
+                 {% if item.get('duration') == 'auto' %}disabled{% endif %}>
+          <label style="display:flex; align-items:center; gap:5px; font-size:13px;
+                        white-space:nowrap; cursor:pointer;">
+            <input type="checkbox" id="duration-auto" name="duration_auto" value="1"
+                   {% if item.get('duration') == 'auto' %}checked{% endif %}
+                   onchange="toggleAutoDur(this)">
+            Auto
+          </label>
+        </div>
+        <div class="hint">
+          Auto: advances to next item when scroll completes or video ends.
+          Only useful for scrolling text and non-looping video.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Transitions ── -->
+  <div class="card">
+    <div class="card-title">Transitions</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Wipe In Effect</label>
+        <select name="wipe_in">
+          <option value="random" {% if item.get('wipe_in')=='random' %}selected{% endif %}>🎲 Random</option>
+          <option value="none"   {% if item.get('wipe_in')=='none'   %}selected{% endif %}>None</option>
+          {% for t in transitions %}
+          <option value="{{ t }}" {% if item.get('wipe_in')==t %}selected{% endif %}>{{ t.replace('_',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Wipe In Speed (sec)</label>
+        <input type="number" name="wipe_in_speed" step="0.1" min="0.1" max="5.0"
+               value="{{ item.get('wipe_in_speed',1.0) }}">
+      </div>
+      <div class="form-group">
+        <label>Wipe Out Effect</label>
+        <select name="wipe_out">
+          <option value="random" {% if item.get('wipe_out')=='random' %}selected{% endif %}>🎲 Random</option>
+          <option value="none"   {% if item.get('wipe_out')=='none'   %}selected{% endif %}>None</option>
+          {% for t in transitions %}
+          <option value="{{ t }}" {% if item.get('wipe_out')==t %}selected{% endif %}>{{ t.replace('_',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Wipe Out Speed (sec)</label>
+        <input type="number" name="wipe_out_speed" step="0.1" min="0.1" max="5.0"
+               value="{{ item.get('wipe_out_speed',1.0) }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Date range ── -->
+  <div class="card">
+    <div class="card-title">Date Range <span class="text-muted" style="font-weight:400;">(optional — leave blank to always show)</span></div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Show From</label>
+        <input type="datetime-local" name="date_from" value="{{ item.get('date_from','') }}">
+      </div>
+      <div class="form-group">
+        <label>Show Until</label>
+        <input type="datetime-local" name="date_to" value="{{ item.get('date_to','') }}">
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Background (shared by all types)                                 -->
+  <!-- ================================================================ -->
+  <div class="card">
+    <div class="card-title">Background</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Background Mode</label>
+        <select name="bg_mode" id="bg-mode" onchange="updateBgMode()">
+          <option value="color" {% if item.get('bg_mode','color')=='color' %}selected{% endif %}>Solid Color</option>
+          {% if item.type in ('image','gif','video') %}
+          <option value="corner" {% if item.get('bg_mode')=='corner' %}selected{% endif %}>Sample from Corner</option>
+          {% endif %}
+          <option value="image" {% if item.get('bg_mode')=='image' %}selected{% endif %}>Background Image</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="bg-color-row">
+        <label>Background Color</label>
+        <input type="color" name="bg_color" value="{{ item.get('bg_color',[0,0,0]) | rgb_hex }}">
+      </div>
+
+      <div class="form-group" id="bg-corner-row" style="display:none;">
+        <label>Sample Corner</label>
+        <select name="bg_corner">
+          {% for c in ['top-left','top-right','bottom-left','bottom-right'] %}
+          <option value="{{ c }}" {% if item.get('bg_corner','top-left')==c %}selected{% endif %}>{{ c.replace('-',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div id="bg-image-row" style="display:none;">
+      <div class="grid-2" style="margin-top:8px;">
+        <div class="form-group">
+          <label>Background Image File</label>
+          <select name="bg_image">
+            <option value="">— None —</option>
+            {% for f in media_files %}
+            {% if f.type == 'image' %}
+            <option value="{{ media_dir }}/{{ f.name }}"
+                    {% if item.get('bg_image','').endswith(f.name) %}selected{% endif %}>
+              {{ f.name }}
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Dim background image (%)</label>
+          <input type="number" name="bg_dim" min="0" max="100"
+                 value="{{ item.get('bg_dim',0) }}">
+          <div class="hint">0 = original, 100 = black. 40–60 makes text readable.</div>
+        </div>
+        <div class="form-group">
+          <label>Background Scale</label>
+          <select name="bg_scale" id="bg-scale" onchange="updateBgScale()">
+            <option value="cover"   {% if item.get('bg_scale','cover')=='cover'   %}selected{% endif %}>Cover (fill, crop edges)</option>
+            <option value="contain" {% if item.get('bg_scale')=='contain' %}selected{% endif %}>Contain (fit, letterbox)</option>
+            <option value="stretch" {% if item.get('bg_scale')=='stretch' %}selected{% endif %}>Stretch (distort to fill)</option>
+            <option value="custom"  {% if item.get('bg_scale')=='custom'  %}selected{% endif %}>Custom scale factor</option>
+          </select>
+        </div>
+        <div class="form-group" id="bg-factor-row"
+             style="{{ '' if item.get('bg_scale')=='custom' else 'display:none' }}">
+          <label>Scale Factor (0.1 – 4.0)</label>
+          <input type="number" name="bg_scale_factor" step="0.05" min="0.1" max="4.0"
+                 value="{{ item.get('bg_scale_factor',1.0) }}">
+          <div class="hint">1.0 = display size, 2.0 = double, 0.5 = half</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Horizontal Offset (-100 to +100)</label>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="range" name="bg_offset_x" min="-100" max="100"
+                   value="{{ item.get('bg_offset_x',0) }}"
+                   oninput="document.getElementById('bg-ox-val').textContent=this.value+'%'"
+                   style="flex:1;">
+            <span id="bg-ox-val" style="min-width:40px; font-size:12px;">{{ item.get('bg_offset_x',0) }}%</span>
+          </div>
+          <div class="hint">0 = centred, -100 = left edge, +100 = right edge</div>
+        </div>
+        <div class="form-group">
+          <label>Vertical Offset (-100 to +100)</label>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="range" name="bg_offset_y" min="-100" max="100"
+                   value="{{ item.get('bg_offset_y',0) }}"
+                   oninput="document.getElementById('bg-oy-val').textContent=this.value+'%'"
+                   style="flex:1;">
+            <span id="bg-oy-val" style="min-width:40px; font-size:12px;">{{ item.get('bg_offset_y',0) }}%</span>
+          </div>
+          <div class="hint">0 = centred, -100 = top edge, +100 = bottom edge</div>
+        </div>
+      </div>
+      <p class="hint" style="margin-top:4px;">
+        💡 Scaled versions are cached automatically — no performance cost after first use.
+      </p>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- Image / GIF specific                                             -->
+  <!-- ================================================================ -->
+  {% if item.type in ('image','gif') %}
+
+  <!-- Media file picker -->
+  <div class="card">
+    <div class="card-title">Media File</div>
+    <input type="hidden" name="file" id="file-input-image"
+           value="{{ item.get('file','') }}">
+    <div class="current-file-box" id="current-file-box-image">
+      <div class="current-file-thumb" id="current-file-thumb-image">
+        {% if item.get('file') %}
+        <img src="{{ url_for('files.thumb', filename=item.get('file','').split('/')[-1]) }}"
+             onerror="this.style.display='none';this.nextSibling.style.display='''">
+        <span style="display:none;">🖼</span>
+        {% else %}
+        🖼
+        {% endif %}
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:600; font-size:13px; margin-bottom:2px;"
+             id="current-file-name-image">
+          {{ item.get('file','').split('/')[-1] or 'No file selected' }}
+        </div>
+        <div class="hint">Click below to change</div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-secondary"
+            onclick="openPicker('image_gif')">
+      📁 Choose {{ 'Image' if item.type == 'image' else 'GIF' }} File…
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Image Layout</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Scale Mode</label>
+        <select name="scale_mode" id="scale-mode" onchange="updateScaleMode()">
+          {% for m,lbl in [('fit','Fit (letterbox)'),('fill','Fill (crop)'),('stretch','Stretch to fill'),('custom','Custom size')] %}
+          <option value="{{ m }}" {% if item.get('scale_mode', item.get('scale','fit'))==m %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" id="scale-factor-row"
+           style="{{ '' if item.get('scale_mode')=='custom' else 'display:none' }}">
+        <label>Scale Factor (0.1 – 1.0)</label>
+        <input type="number" name="scale_factor" step="0.05" min="0.1" max="1.0"
+               value="{{ item.get('scale_factor',1.0) }}">
+        <div class="hint">1.0 = fills available space, 0.5 = half size</div>
+      </div>
+      <div class="form-group">
+        <label>Position</label>
+        <select name="position">
+          {% for p in ['center','top-left','top-center','top-right','middle-left','middle-right','bottom-left','bottom-center','bottom-right'] %}
+          <option value="{{ p }}" {% if item.get('position','center')==p %}selected{% endif %}>{{ p.replace('-',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    {% if item.type == 'image' %}
+    <div class="section-title">Ken Burns Effect</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Enable Ken Burns (slow pan/zoom)</label>
+        <select name="ken_burns" onchange="updateKenBurns()">
+          <option value="0" {% if not item.get('ken_burns') %}selected{% endif %}>Disabled</option>
+          <option value="1" {% if item.get('ken_burns') %}selected{% endif %}>Enabled</option>
+        </select>
+      </div>
+    </div>
+    <div id="kb-opts" style="{{ 'display:none' if not item.get('ken_burns') else '' }}">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Zoom Start (1.0 = full frame)</label>
+          <input type="number" name="kb_zoom_start" step="0.05" min="1.0" max="3.0"
+                 value="{{ item.get('kb_zoom_start',1.0) }}">
+        </div>
+        <div class="form-group">
+          <label>Zoom End</label>
+          <input type="number" name="kb_zoom_end" step="0.05" min="1.0" max="3.0"
+                 value="{{ item.get('kb_zoom_end',1.25) }}">
+        </div>
+        <div class="form-group">
+          <label>Direction</label>
+          <select name="kb_direction">
+            {% for d in ['random','in','out','pan_left','pan_right','pan_up','pan_down'] %}
+            <option value="{{ d }}" {% if item.get('kb_direction','random')==d %}selected{% endif %}>{{ d.replace('_',' ').title() }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- ================================================================ -->
+  <!-- Video specific                                                    -->
+  <!-- ================================================================ -->
+  {% if item.type == 'video' %}
+
+  <!-- Media file picker -->
+  <div class="card">
+    <div class="card-title">Media File</div>
+    <input type="hidden" name="file" id="file-input-video"
+           value="{{ item.get('file','') }}">
+    <div class="current-file-box">
+      <div class="current-file-thumb" id="current-file-thumb-video">
+        {% if item.get('file') %}
+        <img src="{{ url_for('files.thumb', filename=item.get('file','').split('/')[-1]) }}"
+             onerror="this.style.display='none';this.nextSibling.style.display=''">
+        <span style="display:none;">🎬</span>
+        {% else %}
+        🎬
+        {% endif %}
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-weight:600; font-size:13px; margin-bottom:2px;"
+             id="current-file-name-video">
+          {{ item.get('file','').split('/')[-1] or 'No file selected' }}
+        </div>
+        <div class="hint">Click below to change</div>
+      </div>
+    </div>
+    <button type="button" class="btn btn-secondary"
+            onclick="openPicker('video')">
+      📁 Choose Video File…
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Video Layout &amp; Playback</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Scale Mode</label>
+        <select name="scale_mode" onchange="updateScaleMode()">
+          {% for m,lbl in [('fit','Fit (letterbox)'),('fill','Fill (crop)'),('stretch','Stretch'),('custom','Custom size')] %}
+          <option value="{{ m }}" {% if item.get('scale_mode', item.get('scale','fit'))==m %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" id="scale-factor-row"
+           style="{{ '' if item.get('scale_mode')=='custom' else 'display:none' }}">
+        <label>Scale Factor (0.1–1.0)</label>
+        <input type="number" name="scale_factor" step="0.05" min="0.1" max="1.0"
+               value="{{ item.get('scale_factor',1.0) }}">
+      </div>
+      <div class="form-group">
+        <label>Position</label>
+        <select name="position">
+          {% for p in ['center','top-left','top-center','top-right','middle-left','middle-right','bottom-left','bottom-center','bottom-right'] %}
+          <option value="{{ p }}" {% if item.get('position','center')==p %}selected{% endif %}>{{ p.replace('-',' ').title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Loop</label>
+        <select name="loop">
+          <option value="1" {% if item.get('loop',True) %}selected{% endif %}>Yes</option>
+          <option value="0" {% if not item.get('loop',True) %}selected{% endif %}>No (hold last frame)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Loop Mode</label>
+        <select name="loop_mode">
+          <option value="restart"  {% if item.get('loop_mode','restart')=='restart'  %}selected{% endif %}>Restart</option>
+          <option value="pingpong" {% if item.get('loop_mode')=='pingpong' %}selected{% endif %}>Ping-pong</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Loop Count (0 = infinite)</label>
+        <input type="number" name="loop_count" min="0" max="999"
+               value="{{ item.get('loop_count', 0) }}"
+               title="0 = loop forever, 1 = play once, 2 = play twice, etc.">
+        <div class="hint">Works with auto duration: play N times then advance.</div>
+      </div>
+      <div class="form-group">
+        <label>Pre-buffer to RAM</label>
+        <select name="prebuffer">
+          <option value="0" {% if not item.get('prebuffer') %}selected{% endif %}>No (stream)</option>
+          <option value="1" {% if item.get('prebuffer') %}selected{% endif %}>Yes (smooth, short clips)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Start Offset</label>
+        <input type="text" name="start_offset"
+               value="{{ item.get('start_offset','') | timecode }}"
+               placeholder="0  or  3.20  or  1:45  or  1:02:30.05">
+        <div class="hint">ss &nbsp;|&nbsp; ss.ff &nbsp;|&nbsp; mm:ss &nbsp;|&nbsp; hh:mm:ss.ff</div>
+      </div>
+      <div class="form-group">
+        <label>FPS Override (0 = auto)</label>
+        <input type="number" name="fps_override" step="0.001" min="0"
+               value="{{ item.get('fps_override',0) }}">
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ================================================================ -->
+  <!-- Clock specific                                                    -->
+  <!-- ================================================================ -->
+  {% if item.type == 'clock' %}
+  <div class="card">
+    <div class="card-title">Clock Options</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Time Format</label>
+        <input type="text" name="format" value="{{ item.get('format','%H:%M:%S') }}" placeholder="%H:%M:%S">
+      </div>
+      <div class="form-group">
+        <label>Date Format (blank = hide)</label>
+        <input type="text" name="date_format" value="{{ item.get('date_format','%A %d %B %Y') }}">
+      </div>
+      <div class="form-group">
+        <label>Time Color</label>
+        <input type="color" name="color" value="{{ item.get('color',[255,220,0]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Date Color</label>
+        <input type="color" name="date_color" value="{{ item.get('date_color',[180,180,180]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Blink Separator</label>
+        <select name="blink_separator">
+          <option value="1" {% if item.get('blink_separator',True) %}selected{% endif %}>Yes</option>
+          <option value="0" {% if not item.get('blink_separator',True) %}selected{% endif %}>No</option>
+        </select>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ================================================================ -->
+  <!-- Text specific                                                     -->
+  <!-- ================================================================ -->
+  {% if item.type == 'text' %}
+  <div class="card">
+    <div class="card-title">Text Lines</div>
+    <div id="text-lines">
+      {% for line in item.get('lines',[]) %}
+      <div class="line-block" style="background:var(--surface); border:1px solid var(--border);
+           border-radius:6px; padding:12px; margin-bottom:8px;">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Text</label>
+            <textarea name="line_text" rows="2"
+                      style="width:100%;resize:vertical;font-family:monospace;font-size:13px;">{{ line.get('text','') }}</textarea>
+          </div>
+          <div class="form-group">
+            <label>Font</label>
+            <select name="line_font">
+              {% for fn in ['FreeSans.ttf','FreeSansBold.ttf','FreeMono.ttf','FreeSerif.ttf','DejaVuSans.ttf','DejaVuSans-Bold.ttf','DejaVuSansMono.ttf'] %}
+              <option value="{{ fn }}" {% if line.get('font','FreeSans.ttf')==fn %}selected{% endif %}>{{ fn.replace('.ttf','') }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+          <div class="form-group" style="margin:0; min-width:60px;">
+            <label>Size</label>
+            <input type="number" name="line_size" value="{{ line.get('font_size',16) }}" min="6" max="80">
+          </div>
+          <div class="form-group" style="margin:0;">
+            <label>Color</label>
+            <input type="color" name="line_color" value="{{ line.get('color',[255,255,255]) | rgb_hex }}">
+          </div>
+          <div class="form-group" style="margin:0; min-width:80px;">
+            <label>Align</label>
+            <select name="line_align">
+              {% for a in ['center','left','right'] %}
+              <option value="{{ a }}" {% if line.get('align','center')==a %}selected{% endif %}>{{ a.title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0; min-width:100px;">
+            <label>Position</label>
+            <select name="line_position">
+              <option value="" {% if not line.get('position') %}selected{% endif %}>Auto</option>
+              {% for p in ['top','center','bottom','top-left','top-right','bottom-left','bottom-right'] %}
+              <option value="{{ p }}" {% if line.get('position')==p %}selected{% endif %}>{{ p.replace('-',' ').title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin:0; min-width:90px;">
+            <label>Scroll</label>
+            <select name="line_scroll">
+              <option value="" {% if not line.get('scroll') %}selected{% endif %}>Static</option>
+              <option value="left"  {% if line.get('scroll')=='left'  %}selected{% endif %}>← Left</option>
+              <option value="right" {% if line.get('scroll')=='right' %}selected{% endif %}>→ Right</option>
+              <option value="up"    {% if line.get('scroll')=='up'    %}selected{% endif %}>↑ Up</option>
+              <option value="down"  {% if line.get('scroll')=='down'  %}selected{% endif %}>↓ Down</option>
+            </select>
+          </div>
+          <div style="padding-top:18px;">
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeLine(this)">✕</button>
+          </div>
+        </div>
+        <div style="margin-top:6px; display:flex; gap:16px; align-items:center; flex-wrap:wrap;">
+          <label style="font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px;">
+            Scroll speed:
+            <input type="number" name="line_scroll_speed" value="{{ line.get('scroll_speed',2) }}"
+                   min="0.1" max="50" step="0.1" style="width:60px;">
+            px/frame
+          </label>
+          <label style="font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px;">
+            Loops:
+            <input type="number" name="line_loop_count" value="{{ line.get('loop_count',0) }}"
+                   min="0" max="999" style="width:55px;" title="0 = infinite">
+            <span>(0=∞)</span>
+          </label>
+          <label style="font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; cursor:pointer;">
+            <input type="hidden" name="line_wrap_sentinel" value="0">
+            <input type="checkbox" name="line_wrap" value="1"
+                   {% if line.get('wrap', True) %}checked{% endif %}>
+            Word wrap
+          </label>
+          <label style="font-size:11px; color:var(--muted); display:flex; align-items:center; gap:4px; cursor:pointer;">
+            <input type="hidden" name="line_pixel_sentinel" value="0">
+            <input type="checkbox" name="line_pixel_font" value="1"
+                   {% if line.get('pixel_font') %}checked{% endif %}>
+            LED pixel font (no anti-alias)
+          </label>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-sm btn-secondary" onclick="addLine()">＋ Add Line</button>
+
+    <div style="margin-top:12px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <label style="font-size:13px; display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" name="v_center" value="1"
+               {% if item.get('v_center') %}checked{% endif %}>
+        Vertically centre multi-line block
+      </label>
+    </div>
+
+    <p class="hint" style="margin-top:8px;">
+      Inline codes: §Crrggbb; = color &nbsp; §Fname; = font &nbsp; §Snn; = size &nbsp; §R = reset<br>
+      "Auto" position stacks lines vertically. Use explicit positions for floating lines.<br>
+      Scroll strips are pre-rendered for smooth, glitch-free animation.
+    </p>
+  </div>
+  {% endif %}
+
+  <!-- ================================================================ -->
+  <!-- Weather specific                                                  -->
+  <!-- ================================================================ -->
+  {% if item.type == 'weather' %}
+  <div class="card">
+    <div class="card-title">Weather Options</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Latitude</label>
+        <input type="number" name="latitude" step="0.0001"
+               value="{{ item.get('latitude', 52.37) }}">
+      </div>
+      <div class="form-group">
+        <label>Longitude</label>
+        <input type="number" name="longitude" step="0.0001"
+               value="{{ item.get('longitude', 4.89) }}">
+      </div>
+      <div class="form-group">
+        <label>Location Name (display only)</label>
+        <input type="text" name="location_name"
+               value="{{ item.get('location_name', '') }}"
+               placeholder="e.g. Amsterdam">
+      </div>
+      <div class="form-group">
+        <label>Temperature Units</label>
+        <select name="units">
+          <option value="celsius"    {% if item.get('units','celsius')=='celsius'    %}selected{% endif %}>Celsius (°C)</option>
+          <option value="fahrenheit" {% if item.get('units')=='fahrenheit' %}selected{% endif %}>Fahrenheit (°F)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Forecast Days (1–5)</label>
+        <input type="number" name="forecast_days" min="1" max="5"
+               value="{{ item.get('forecast_days', 3) }}">
+        <div class="hint">1 = current only (large), 2–5 = current + forecast strip</div>
+      </div>
+      <div class="form-group">
+        <label>Update Interval (seconds)</label>
+        <input type="number" name="update_interval" min="60"
+               value="{{ item.get('update_interval', 600) }}">
+      </div>
+      <div class="form-group">
+        <label>Show Humidity</label>
+        <select name="show_humidity">
+          <option value="1" {% if item.get('show_humidity', True) %}selected{% endif %}>Yes</option>
+          <option value="0" {% if not item.get('show_humidity', True) %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Show Wind Speed</label>
+        <select name="show_wind">
+          <option value="1" {% if item.get('show_wind', True) %}selected{% endif %}>Yes</option>
+          <option value="0" {% if not item.get('show_wind', True) %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Custom Icon Folder (optional)</label>
+        <input type="text" name="icon_dir"
+               value="{{ item.get('icon_dir', '/root/led-signage/media/weather-icons') }}"
+               placeholder="/root/led-signage/media/weather-icons">
+        <div class="hint">Place PNG files named by WMO code: 0.png, 61.png, etc. Builtin icons used as fallback.</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ================================================================ -->
+  <!-- Countdown specific                                                -->
+  <!-- ================================================================ -->
+  {% if item.type == 'countdown' %}
+  <div class="card">
+    <div class="card-title">Countdown Options</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Target Date &amp; Time</label>
+        <input type="datetime-local" name="target_date"
+               value="{{ item.get('target_date','2026-12-31T00:00:00') }}">
+      </div>
+      <div class="form-group">
+        <label>Direction</label>
+        <select name="direction">
+          <option value="down" {% if item.get('direction','down')=='down' %}selected{% endif %}>Count down to target</option>
+          <option value="up"   {% if item.get('direction')=='up' %}selected{% endif %}>Count up from target (elapsed)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Units to show</label>
+        {% set parts = item.get('format_parts', ['days','hours','minutes','seconds']) %}
+        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:4px;">
+          {% for u in ['weeks','days','hours','minutes','seconds'] %}
+          <label style="display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer;">
+            <input type="checkbox" name="format_parts" value="{{ u }}"
+                   {% if u in parts %}checked{% endif %}>
+            {{ u.title() }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Separator between units</label>
+        <input type="text" name="separator" style="width:80px;"
+               value="{{ item.get('separator',':') }}">
+        <span class="hint">e.g. ":" or " " or " : "</span>
+      </div>
+      <div class="form-group">
+        <label>Show labels (d / days / hrs)</label>
+        <select name="show_labels">
+          <option value="1" {% if item.get('show_labels',True) %}selected{% endif %}>Yes</option>
+          <option value="0" {% if not item.get('show_labels',True) %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Label Style</label>
+        <select name="label_style">
+          <option value="short" {% if item.get('label_style','short')=='short' %}selected{% endif %}>Short (d h m s)</option>
+          <option value="full"  {% if item.get('label_style')=='full' %}selected{% endif %}>Full (days hrs min sec)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Number Color</label>
+        <input type="color" name="number_color"
+               value="{{ item.get('number_color',[255,220,0]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Label Color</label>
+        <input type="color" name="label_color"
+               value="{{ item.get('label_color',[180,180,180]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Font</label>
+        <select name="font">
+          {% for fn in ['FreeSansBold.ttf','FreeSans.ttf','FreeMono.ttf','DejaVuSans-Bold.ttf','DejaVuSansMono.ttf'] %}
+          <option value="{{ fn }}" {% if item.get('font','FreeSansBold.ttf')==fn %}selected{% endif %}>{{ fn.replace('.ttf','') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Font Size (0 = auto)</label>
+        <input type="number" name="font_size" min="0" max="80"
+               value="{{ item.get('font_size',0) }}">
+      </div>
+      <div class="form-group">
+        <label>Position</label>
+        <select name="position">
+          {% for p in ['center','top','bottom'] %}
+          <option value="{{ p }}" {% if item.get('position','center')==p %}selected{% endif %}>{{ p.title() }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Prefix text (above countdown)</label>
+        <input type="text" name="prefix_text"
+               value="{{ item.get('prefix_text','') }}" placeholder="e.g. 'Until Christmas'">
+      </div>
+      <div class="form-group">
+        <label>Prefix color</label>
+        <input type="color" name="prefix_color"
+               value="{{ item.get('prefix_color',[200,200,255]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Suffix text (below countdown)</label>
+        <input type="text" name="suffix_text"
+               value="{{ item.get('suffix_text','') }}" placeholder="e.g. 'to go!'">
+      </div>
+      <div class="form-group">
+        <label>Suffix color</label>
+        <input type="color" name="suffix_color"
+               value="{{ item.get('suffix_color',[200,200,200]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Finished text (when zero reached)</label>
+        <input type="text" name="finished_text"
+               value="{{ item.get('finished_text','🎉 Done!') }}">
+      </div>
+      <div class="form-group">
+        <label>Finished color</label>
+        <input type="color" name="finished_color"
+               value="{{ item.get('finished_color',[255,180,0]) | rgb_hex }}">
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div style="display:flex; gap:8px; margin-top:4px;">
+    <button type="submit" class="btn btn-success">Save Changes</button>
+    <a href="{{ url_for('playlist.index') }}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<!-- ── File picker modal ── -->
+<div class="fp-overlay" id="fp-overlay" onclick="if(event.target===this)closePicker()">
+  <div class="fp-modal">
+    <div class="fp-header">
+      <h3 id="fp-title">Choose File</h3>
+      <input type="text" id="fp-search" placeholder="🔍 Filter by name…"
+             style="width:200px; font-size:13px;"
+             oninput="filterPicker(this.value)">
+      <button class="fp-close" onclick="closePicker()">✕</button>
+    </div>
+    <div class="fp-grid" id="fp-grid"></div>
+    <div class="fp-footer">
+      <span class="fp-selected-name" id="fp-selected-label">No file selected</span>
+      <button class="btn btn-secondary" onclick="closePicker()">Cancel</button>
+      <button class="btn btn-success" id="fp-confirm" onclick="confirmPicker()" disabled>
+        ✓ Select
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── File picker data injected from server ──
+const MEDIA_FILES = {{ media_files | tojson }};
+const MEDIA_DIR   = {{ media_dir   | tojson }};
+const THUMB_URL   = '/files/thumb/';
+
+let _pickerMode    = 'image_gif';   // 'image_gif' | 'video'
+let _pickerTarget  = null;          // hidden input id
+let _pickerNameEl  = null;          // display element id
+let _selectedFile  = null;          // currently highlighted file object
+let _allItems      = [];            // current filtered set
+
+function openPicker(mode) {
+  _pickerMode   = mode;
+  _pickerTarget = mode === 'video' ? 'file-input-video' : 'file-input-image';
+  _pickerNameEl = mode === 'video' ? 'current-file-name-video' : 'current-file-name-image';
+  _selectedFile = null;
+
+  document.getElementById('fp-title').textContent =
+    mode === 'video' ? 'Choose Video File' : 'Choose Image / GIF File';
+  document.getElementById('fp-selected-label').textContent = 'No file selected';
+  document.getElementById('fp-confirm').disabled = true;
+  document.getElementById('fp-search').value = '';
+
+  buildGrid('');
+  document.getElementById('fp-overlay').classList.add('open');
+}
+
+function closePicker() {
+  document.getElementById('fp-overlay').classList.remove('open');
+}
+
+function buildGrid(filter) {
+  const grid = document.getElementById('fp-grid');
+  grid.innerHTML = '';
+
+  // Filter by type and search term
+  const allowed = _pickerMode === 'video'
+    ? ['video']
+    : ['image', 'gif'];
+
+  _allItems = MEDIA_FILES.filter(f => {
+    if (!allowed.includes(f.type)) return false;
+    if (filter && !f.name.toLowerCase().includes(filter.toLowerCase())) return false;
+    return true;
+  });
+
+  if (_allItems.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1; text-align:center; padding:40px;
+      color:var(--muted);">No ${_pickerMode === 'video' ? 'video' : 'image/GIF'} files found.</div>`;
+    return;
+  }
+
+  // Current value
+  const currentVal = document.getElementById(_pickerTarget)?.value || '';
+  const currentName = currentVal.split('/').pop();
+
+  _allItems.forEach(f => {
+    const div = document.createElement('div');
+    div.className = 'fp-item' + (f.name === currentName ? ' selected' : '');
+    div.dataset.name = f.name;
+
+    const emoji = f.type === 'video' ? '🎬' : f.type === 'gif' ? '🎞' : '🖼';
+    div.innerHTML = `
+      <div class="fp-thumb">
+        <img src="${THUMB_URL}${encodeURIComponent(f.name)}"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+             style="width:100%;height:100%;object-fit:cover;">
+        <div style="display:none;width:100%;height:100%;align-items:center;
+                    justify-content:center;font-size:28px;">${emoji}</div>
+      </div>
+      <div class="fp-name">${f.name}</div>`;
+
+    div.addEventListener('click', () => selectPickerItem(f, div));
+    div.addEventListener('dblclick', () => { selectPickerItem(f, div); confirmPicker(); });
+    grid.appendChild(div);
+
+    // Auto-scroll to selected
+    if (f.name === currentName) {
+      setTimeout(() => div.scrollIntoView({block:'nearest'}), 50);
+    }
+  });
+}
+
+function filterPicker(val) {
+  buildGrid(val);
+}
+
+function selectPickerItem(file, el) {
+  _selectedFile = file;
+  // Highlight
+  document.querySelectorAll('.fp-item').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('fp-selected-label').textContent = file.name;
+  document.getElementById('fp-confirm').disabled = false;
+}
+
+function confirmPicker() {
+  if (!_selectedFile) return;
+
+  // Resolve to .matrix.mp4 if it exists (use pre-rendered version transparently)
+  // We pass the original name; the server resolves the matrix version
+  const fullPath = MEDIA_DIR + '/' + _selectedFile.name;
+
+  // Update hidden input
+  const inp = document.getElementById(_pickerTarget);
+  if (inp) inp.value = fullPath;
+
+  // Update display name
+  const nameEl = document.getElementById(_pickerNameEl);
+  if (nameEl) nameEl.textContent = _selectedFile.name;
+
+  // Update thumbnail preview for whichever type is active
+  const thumbId = _pickerMode === 'video'
+    ? 'current-file-thumb-video'
+    : 'current-file-thumb-image';
+  const th = document.getElementById(thumbId);
+  if (th) {
+    const emoji = _pickerMode === 'video' ? '🎬' : '🖼';
+    th.innerHTML = `<img src="${THUMB_URL}${encodeURIComponent(_selectedFile.name)}"
+      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+      style="width:100%;height:100%;object-fit:cover;">
+      <div style="display:none;width:100%;height:100%;align-items:center;
+                  justify-content:center;font-size:20px;">${emoji}</div>`;
+  }
+
+  closePicker();
+}
+
+// Keyboard: Escape closes modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePicker();
+});
+function toggleAutoDur(cb) {
+  const inp = document.getElementById('duration-input');
+  inp.disabled = cb.checked;
+  if (cb.checked) inp.value = '';
+}
+
+function updateBgScale() {
+  const sel = document.getElementById('bg-scale');
+  const row = document.getElementById('bg-factor-row');
+  if (sel && row) row.style.display = sel.value === 'custom' ? '' : 'none';
+}
+
+function updateBgMode() {
+  const mode     = document.getElementById('bg-mode').value;
+  document.getElementById('bg-color-row').style.display  = mode === 'color'  ? '' : 'none';
+  document.getElementById('bg-corner-row').style.display = mode === 'corner' ? '' : 'none';
+  document.getElementById('bg-image-row').style.display  = mode === 'image'  ? '' : 'none';
+}
+
+function updateScaleMode() {
+  const sel = document.getElementById('scale-mode');
+  const row = document.getElementById('scale-factor-row');
+  if (sel && row) row.style.display = sel.value === 'custom' ? '' : 'none';
+}
+
+function updateKenBurns() {
+  const sel  = document.querySelector('[name="ken_burns"]');
+  const opts = document.getElementById('kb-opts');
+  if (sel && opts) opts.style.display = sel.value === '1' ? '' : 'none';
+}
+
+// Init visibility
+updateBgMode();
+
+// ---- Text line builder ----
+function addLine() {
+  const c   = document.getElementById('text-lines');
+  const div = document.createElement('div');
+  div.className = 'line-block';
+  div.style = 'background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:8px;';
+  div.innerHTML = `
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Text</label>
+        <textarea name="line_text" rows="2"
+                  style="width:100%;resize:vertical;font-family:monospace;font-size:13px;"
+                  placeholder="Enter text"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Font</label>
+        <select name="line_font">
+          <option value="FreeSans.ttf">FreeSans</option>
+          <option value="FreeSansBold.ttf">FreeSans Bold</option>
+          <option value="FreeMono.ttf">FreeMono</option>
+          <option value="FreeSerif.ttf">FreeSerif</option>
+          <option value="DejaVuSans.ttf">DejaVu Sans</option>
+          <option value="DejaVuSans-Bold.ttf">DejaVu Sans Bold</option>
+          <option value="DejaVuSansMono.ttf">DejaVu Mono</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:70px 70px 90px 90px 90px auto;gap:8px;align-items:end;">
+      <div class="form-group" style="margin:0;">
+        <label>Size</label>
+        <input type="number" name="line_size" value="16" min="6" max="80">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Color</label>
+        <input type="color" name="line_color" value="#ffffff">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Align</label>
+        <select name="line_align">
+          <option value="center">Center</option>
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Position</label>
+        <select name="line_position">
+          <option value="">Auto stack</option>
+          <option value="top">Top</option>
+          <option value="center">Center</option>
+          <option value="bottom">Bottom</option>
+          <option value="top-left">Top Left</option>
+          <option value="top-right">Top Right</option>
+          <option value="bottom-left">Bottom Left</option>
+          <option value="bottom-right">Bottom Right</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Scroll</label>
+        <select name="line_scroll">
+          <option value="">Static</option>
+          <option value="left">← Left</option>
+          <option value="right">→ Right</option>
+          <option value="up">↑ Up</option>
+          <option value="down">↓ Down</option>
+        </select>
+      </div>
+      <div><button type="button" class="btn btn-sm btn-danger" onclick="removeLine(this)">✕</button></div>
+    </div>
+    <div style="margin-top:6px;">
+      <span style="font-size:11px;color:var(--muted);">Speed:</span>
+      <input type="number" name="line_scroll_speed" value="2" min="0.1" max="50" step="0.1"
+             style="width:55px;margin:0 4px;">
+      <span style="font-size:11px;color:var(--muted);">Loops:</span>
+      <input type="number" name="line_loop_count" value="0" min="0" max="999"
+             style="width:50px;margin:0 4px;" title="0=infinite">
+      <label style="font-size:11px;color:var(--muted);cursor:pointer;margin-left:4px;">
+        <input type="checkbox" name="line_wrap" value="1" checked> Wrap
+      </label>
+      <label style="font-size:11px;color:var(--muted);cursor:pointer;margin-left:8px;">
+        <input type="checkbox" name="line_pixel_font" value="1"> Pixel font
+      </label>
+    </div>`;
+  c.appendChild(div);
+}
+
+function removeLine(btn) {
+  const blocks = document.querySelectorAll('.line-block');
+  if (blocks.length > 1) btn.closest('.line-block').remove();
+}
+</script>
+{% endblock %}

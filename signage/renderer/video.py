@@ -1,0 +1,252 @@
+"""
+╔══════════════════════════════════════════════════════════════════════════════╗
+║ PixelCast - Professional LED Matrix Signage System                          ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║ File:        signage/renderer/video.py                                       ║
+║ Version:     1.0.0                                                           ║
+║ Author:      Bas                                                             ║
+║ Description: Video renderer using PyAV - supports MP4, AVI, MOV with        ║
+║              multiple scaling modes, loop modes (restart/pingpong), start    ║
+║              offset, and background options. Auto-uses transcoded versions.  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+"""
+
+import time
+import threading
+import logging
+import numpy as np
+from PIL import Image
+from .base import BaseRenderer
+from .utils import load_background, fit_image, paste_at
+from signage.timecode import parse_timecode
+
+log = logging.getLogger('renderer.video')
+
+
+class VideoRenderer(BaseRenderer):
+
+    def __init__(self, item: dict, width: int, height: int,
+                 lightweight: bool = False):
+        super().__init__(item, width, height)
+        from signage.transcoder import resolve_video_path as _rvp
+        self._path         = _rvp(item.get('file', ''))
+        self._scale_mode   = item.get('scale_mode', item.get('scale', 'fit'))
+        self._scale_factor = float(item.get('scale_factor', 1.0))
+        self._position     = item.get('position', 'center')
+        self._loop         = item.get('loop', True)
+        self._loop_mode    = item.get('loop_mode', 'restart')
+        self._loop_count   = int(item.get('loop_count', 0))   # 0 = infinite
+        self._fps_override = float(item.get('fps_override', 0) or 0)
+        self._lightweight  = lightweight
+        self._want_prebuf  = item.get('prebuffer', False) and not lightweight
+        self._item         = item   # keep for bg loading
+
+        raw_offset = item.get('start_offset', 0)
+        try:
+            self._start_offset = parse_timecode(str(raw_offset))
+        except Exception:
+            self._start_offset = 0.0
+
+        self._first         = None
+        self._container     = None
+        self._video_fps     = 25.0
+        self._done          = False   # set True when video ends (for auto duration)
+        self._prebuffered   = None
+        self._prebuf_ready  = threading.Event()
+        self._prebuf_thread = None
+        self._bg_cache      = None   # cached background PIL image
+
+        self._open()
+        # Pre-build background canvas once — reused for every frame
+        self._bg_cache = load_background(width, height, item)
+        if self._want_prebuf and self._container is not None:
+            self._prebuf_thread = threading.Thread(
+                target=self._do_prebuffer, daemon=True,
+                name='VideoPreBuffer')
+            self._prebuf_thread.start()
+
+    def _open(self):
+        try:
+            import av
+            self._container = av.open(self._path)
+            stream = self._container.streams.video[0]
+            # Set thread_type BEFORE any decoding/seeking — it cannot be
+            # changed after the codec is opened
+            stream.thread_type = 'AUTO'
+            detected        = float(stream.average_rate or 25.0)
+            self._video_fps = self._fps_override or detected
+            log.info(f"Video opened: {self._path} @ {self._video_fps:.3f}fps")
+        except Exception as e:
+            log.error(f"Failed to open video '{self._path}': {e}")
+            self._container = None
+
+    def _seek_to_offset(self, container):
+        if self._start_offset <= 0:
+            return
+        try:
+            container.seek(int(self._start_offset * 1_000_000))
+        except Exception as e:
+            log.warning(f"Seek failed: {e}")
+
+    def _pil_to_array(self, pil_img: Image.Image) -> np.ndarray:
+        """Convert a decoded video frame PIL image to display-sized numpy array.
+        Background is cached — only the video frame is resized per-frame.
+        """
+        # For corner sampling: resolve bg on first real frame, then cache
+        if self._bg_cache is None or            (self._item.get('bg_mode') == 'corner' and self._first is None):
+            self._bg_cache = load_background(
+                self.width, self.height, self._item, pil_img)
+
+        sized  = fit_image(pil_img, self.width, self.height,
+                           self._scale_mode, self._scale_factor,
+                           fast=True)   # BILINEAR — adequate for video on LED
+        canvas = self._bg_cache.copy()   # cheap pixel copy, no I/O
+        paste_at(canvas, sized, self._position)
+        if canvas.mode != 'RGB':
+            canvas = canvas.convert('RGB')
+        return np.array(canvas, dtype=np.uint8)
+
+    def _do_prebuffer(self):
+        import av
+        frames = []
+        try:
+            tmp    = av.open(self._path)
+            self._seek_to_offset(tmp)
+            stream = tmp.streams.video[0]
+            stream.thread_type = 'AUTO'
+            for packet in tmp.demux(stream):
+                for f in packet.decode():
+                    frames.append(self._pil_to_array(f.to_image().convert('RGB')))
+            tmp.close()
+        except Exception as e:
+            log.error(f"Pre-buffer failed: {e}")
+            self._prebuf_ready.set()
+            return
+        mb = len(frames) * self.width * self.height * 3 / 1_048_576
+        log.info(f"Pre-buffered {len(frames)} frames ({mb:.1f}MB)")
+        if mb > 200:
+            log.warning(f"Pre-buffer uses {mb:.0f}MB")
+        self._prebuffered = frames
+        if frames and self._first is None:
+            self._first = frames[0].copy()
+        self._prebuf_ready.set()
+
+    def first_frame(self) -> np.ndarray:
+        if self._first is not None:
+            return self._first.copy()
+        if self._container is None:
+            return self._black()
+        try:
+            import av
+            tmp    = av.open(self._path)
+            self._seek_to_offset(tmp)
+            stream = tmp.streams.video[0]
+            stream.thread_type = 'AUTO'
+            for packet in tmp.demux(stream):
+                for frame in packet.decode():
+                    self._first = self._pil_to_array(
+                        frame.to_image().convert('RGB'))
+                    tmp.close()
+                    return self._first.copy()
+            tmp.close()
+        except Exception as e:
+            log.error(f"first_frame failed: {e}")
+        return self._black()
+
+    def frames(self):
+        if self._container is None and self._prebuffered is None:
+            while True: yield self._black()
+            return
+        if self._want_prebuf:
+            if self._prebuf_ready.is_set() and self._prebuffered:
+                yield from self._play_buffer(self._prebuffered)
+            else:
+                yield from self._stream_with_handoff()
+        else:
+            yield from self._stream_from_disk()
+
+    def _stream_with_handoff(self):
+        for frame in self._single_pass():
+            yield frame
+        if not self._loop:
+            while True: yield self._first or self._black()
+            return
+        while True:
+            if self._prebuf_ready.is_set() and self._prebuffered:
+                yield from self._play_buffer(self._prebuffered)
+                if not self._loop: return
+            else:
+                for frame in self._single_pass():
+                    yield frame
+
+    def _single_pass(self):
+        try:
+            self._container.seek(0)
+            self._seek_to_offset(self._container)
+            stream = self._container.streams.video[0]
+            # thread_type already set in _open() before codec was opened
+            period   = 1.0 / self._video_fps
+            deadline = time.perf_counter() + period
+            collected = []
+            for packet in self._container.demux(stream):
+                for av_frame in packet.decode():
+                    arr = self._pil_to_array(av_frame.to_image().convert('RGB'))
+                    sleep_t = deadline - time.perf_counter()
+                    if sleep_t > 0: time.sleep(sleep_t)
+                    deadline += period
+                    yield arr
+                    if self._loop_mode == 'pingpong':
+                        collected.append(arr)
+            if self._loop_mode == 'pingpong' and collected:
+                deadline = time.perf_counter() + period
+                for arr in reversed(collected):
+                    sleep_t = deadline - time.perf_counter()
+                    if sleep_t > 0: time.sleep(sleep_t)
+                    deadline += period
+                    yield arr
+        except Exception as e:
+            log.error(f"Stream error: {e}")
+            yield self._black()
+
+    def _stream_from_disk(self):
+        plays = 0
+        while True:
+            for frame in self._single_pass(): yield frame
+            plays += 1
+            self._done = True   # signal one complete play for auto-duration
+            if not self._loop:
+                while True: yield self._first or self._black()
+                return
+            if self._loop_count > 0 and plays >= self._loop_count:
+                # Held on last frame indefinitely after loop limit
+                while True: yield self._first or self._black()
+                return
+
+    def _play_buffer(self, buf):
+        period = 1.0 / self._video_fps
+        plays  = 0
+        while True:
+            indices = list(range(len(buf)))
+            if self._loop_mode == 'pingpong':
+                indices += list(range(len(buf) - 2, 0, -1))
+            deadline = time.perf_counter() + period
+            for i in indices:
+                sleep_t = deadline - time.perf_counter()
+                if sleep_t > 0: time.sleep(sleep_t)
+                deadline += period
+                yield buf[i]
+            plays += 1
+            self._done = True   # signal one complete play for auto-duration
+            if not self._loop:
+                while True: yield buf[-1]
+                return
+            if self._loop_count > 0 and plays >= self._loop_count:
+                while True: yield buf[-1]
+                return
+
+    def close(self):
+        if self._container:
+            try: self._container.close()
+            except Exception: pass
+            self._container = None
+        self._prebuffered = None

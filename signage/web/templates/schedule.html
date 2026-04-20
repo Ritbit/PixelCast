@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% block title %}Schedule — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+.rule-row {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 14px 16px; margin-bottom: 10px;
+}
+.day-check { display:inline-flex; align-items:center; gap:4px;
+             margin-right:8px; font-size:13px; cursor:pointer; }
+.day-check input { width:auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 class="page-title" style="margin:0;">Display Schedule</h1>
+</div>
+
+<form method="post" id="schedule-form">
+  <input type="hidden" name="action" value="save">
+
+  <div class="card">
+    <div class="card-title">Schedule Settings</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Enable Schedule</label>
+        <select name="enabled">
+          <option value="1" {% if cfg.enabled %}selected{% endif %}>Enabled</option>
+          <option value="0" {% if not cfg.enabled %}selected{% endif %}>Disabled</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Timezone</label>
+        <input type="text" name="timezone"
+               value="{{ cfg.get('timezone','Europe/Amsterdam') }}"
+               placeholder="Europe/Amsterdam">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div class="card-title" style="margin:0;">Rules</div>
+      <button type="button" class="btn btn-primary btn-sm" onclick="addRule()">+ Add Rule</button>
+    </div>
+
+    <div id="rules-container">
+      {% for rule in cfg.get('rules', []) %}
+      {% set ridx = loop.index0 %}
+      <div class="rule-row" id="rule-{{ ridx }}">
+        <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+
+          <div class="form-group" style="margin:0; width:100px;">
+            <label>Time</label>
+            <input type="time" name="rule_{{ ridx }}_time" value="{{ rule.get('time','08:00') }}">
+          </div>
+
+          <div class="form-group" style="margin:0; width:130px;">
+            <label>Action</label>
+            <select name="rule_{{ ridx }}_action"
+                    onchange="toggleBrightness(this, {{ ridx }})">
+              <option value="on"  {% if rule.get('action')=='on'  %}selected{% endif %}>Turn On</option>
+              <option value="off" {% if rule.get('action')=='off' %}selected{% endif %}>Turn Off</option>
+              <option value="dim" {% if rule.get('action')=='dim' %}selected{% endif %}>Dim</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin:0; width:120px;
+               {{ 'display:none' if rule.get('action') != 'dim' }}"
+               id="bri-{{ ridx }}">
+            <label>Brightness %</label>
+            <input type="number" name="rule_{{ ridx }}_brightness"
+                   value="{{ rule.get('brightness', 30) }}" min="1" max="100">
+          </div>
+
+          <div class="form-group" style="margin:0; flex:1; min-width:260px;">
+            <label>Days</label>
+            <div>
+              {% for day in day_names %}
+              {% set didx = loop.index0 %}
+              <label class="day-check">
+                <input type="checkbox"
+                       name="rule_{{ ridx }}_days"
+                       value="{{ didx }}"
+                       {% if didx in rule.get('days', [0,1,2,3,4,5,6]) %}checked{% endif %}>
+                {{ day }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div style="padding-top:18px;">
+            <button type="button" class="btn btn-sm btn-danger"
+                    onclick="removeRule({{ ridx }})">✕</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if not cfg.get('rules') %}
+    <p class="text-muted" id="no-rules-msg">
+      No rules yet. Click <strong>+ Add Rule</strong> to create one.
+    </p>
+    {% endif %}
+  </div>
+
+  <div style="display:flex; gap:8px;">
+    <button type="submit" class="btn btn-success">Save Schedule</button>
+    <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dayNames = {{ day_names | tojson }};
+let ruleCount  = {{ cfg.get('rules', []) | length }};
+
+function addRule() {
+  const noMsg = document.getElementById('no-rules-msg');
+  if (noMsg) noMsg.style.display = 'none';
+
+  const n   = ruleCount++;
+  const div = document.createElement('div');
+  div.className = 'rule-row';
+  div.id = 'rule-' + n;
+
+  const dayChecks = dayNames.map((d, i) =>
+    `<label class="day-check">
+      <input type="checkbox" name="rule_${n}_days" value="${i}" checked> ${d}
+    </label>`
+  ).join('');
+
+  div.innerHTML = `
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+      <div class="form-group" style="margin:0; width:100px;">
+        <label>Time</label>
+        <input type="time" name="rule_${n}_time" value="08:00">
+      </div>
+      <div class="form-group" style="margin:0; width:130px;">
+        <label>Action</label>
+        <select name="rule_${n}_action" onchange="toggleBrightness(this,${n})">
+          <option value="on">Turn On</option>
+          <option value="off">Turn Off</option>
+          <option value="dim">Dim</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0; width:120px; display:none;" id="bri-${n}">
+        <label>Brightness %</label>
+        <input type="number" name="rule_${n}_brightness" value="30" min="1" max="100">
+      </div>
+      <div class="form-group" style="margin:0; flex:1; min-width:260px;">
+        <label>Days</label>
+        <div>${dayChecks}</div>
+      </div>
+      <div style="padding-top:18px;">
+        <button type="button" class="btn btn-sm btn-danger"
+                onclick="removeRule(${n})">✕</button>
+      </div>
+    </div>`;
+
+  document.getElementById('rules-container').appendChild(div);
+}
+
+function removeRule(n) {
+  const el = document.getElementById('rule-' + n);
+  if (el) el.remove();
+}
+
+function toggleBrightness(sel, n) {
+  const bri = document.getElementById('bri-' + n);
+  if (bri) bri.style.display = sel.value === 'dim' ? '' : 'none';
+}
+</script>
+{% endblock %}

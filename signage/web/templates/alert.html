@@ -1,0 +1,381 @@
+{% extends 'base.html' %}
+{% block title %}Alert — LED Signage{% endblock %}
+
+{% block head %}
+<style>
+.section-title {
+  font-size:11px; font-weight:600; text-transform:uppercase;
+  letter-spacing:.06em; color:var(--muted); margin:16px 0 8px;
+  padding-bottom:5px; border-bottom:1px solid var(--border);
+}
+.hint { font-size:11px; color:var(--muted); margin-top:3px; }
+.line-block {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:6px; padding:12px; margin-bottom:8px;
+}
+pre.api-code {
+  background:var(--surface); padding:10px 12px; border-radius:6px;
+  font-size:11px; overflow-x:auto; white-space:pre-wrap; margin:0;
+  border:1px solid var(--border);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+  <h1 class="page-title" style="margin:0;">🚨 Priority Alert</h1>
+  <div id="alert-status-badge" style="display:none; padding:6px 14px;
+       background:rgba(255,50,50,.15); border:1px solid var(--red);
+       border-radius:20px; color:var(--red); font-size:13px; font-weight:600;">
+    🚨 Alert Active — <span id="badge-remaining">—</span>s
+  </div>
+</div>
+
+<div class="grid-2" style="align-items:start;">
+
+  <!-- ── LEFT: editor ── -->
+  <div>
+    <!-- Background -->
+    <div class="card">
+      <div class="card-title">Background</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Background Mode</label>
+          <select id="a-bg-mode" onchange="updateBgMode()">
+            <option value="color">Solid Color</option>
+            <option value="image">Background Image</option>
+          </select>
+        </div>
+        <div class="form-group" id="a-bg-color-row">
+          <label>Background Color</label>
+          <input type="color" id="a-bg-color" value="#000000">
+        </div>
+      </div>
+      <div id="a-bg-image-row" style="display:none;">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>Background Image</label>
+            <select id="a-bg-image">
+              <option value="">— None —</option>
+              {% for f in media_files %}
+              {% if f.type == 'image' %}
+              <option value="{{ media_dir }}/{{ f.name }}">{{ f.name }}</option>
+              {% endif %}
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Dim (%)</label>
+            <input type="number" id="a-bg-dim" value="0" min="0" max="100">
+            <div class="hint">0 = original, 60 = dark enough for text</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text lines -->
+    <div class="card">
+      <div class="card-title">Text Lines</div>
+      <div id="alert-lines"></div>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="addLine()">＋ Add Line</button>
+      <p class="hint" style="margin-top:8px;">
+        Inline codes: §Crrggbb; = color &nbsp; §Fname; = font &nbsp; §Snn; = size &nbsp; §R = reset<br>
+        "Auto" position stacks lines. Explicit positions float independently.
+      </p>
+    </div>
+
+    <!-- Options -->
+    <div class="card">
+      <div class="card-title">Alert Options</div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Duration (seconds)</label>
+          <input type="number" id="a-dur" value="15" min="1" max="3600">
+        </div>
+        <div class="form-group">
+          <label>Vertical centre lines</label>
+          <select id="a-vcenter">
+            <option value="0">No</option>
+            <option value="1" selected>Yes</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Buttons -->
+    <div style="display:flex; gap:10px; margin-top:4px;">
+      <button class="btn btn-danger" onclick="sendAlert()" style="flex:1; font-size:15px; padding:12px;">
+        🚨 Show Alert Now
+      </button>
+      <button class="btn btn-secondary" onclick="clearAlert()" style="padding:12px 20px;">
+        ✕ Clear
+      </button>
+    </div>
+    <div id="alert-feedback" style="margin-top:10px; font-size:13px;"></div>
+  </div>
+
+  <!-- ── RIGHT: status + API docs ── -->
+  <div>
+    <div class="card">
+      <div class="card-title">Status</div>
+      <div id="alert-info" class="text-muted" style="font-size:13px; padding:8px 0;">
+        Checking…
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">REST API — Quick Reference</div>
+      <div class="section-title">Your API Key</div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+        <input type="text" value="{{ api_key }}" readonly id="api-key-field"
+               style="font-family:monospace; font-size:12px; flex:1;">
+        <button class="btn btn-sm btn-secondary"
+                onclick="navigator.clipboard.writeText(document.getElementById('api-key-field').value);this.textContent='✓'">
+          📋
+        </button>
+      </div>
+
+      <div class="section-title">Show alert</div>
+      <pre class="api-code">curl -X POST http://{{ request.host }}/api/v1/alert \
+  -H "Authorization: Bearer {{ api_key }}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "lines": [
+      {"text":"ALERT","color":[255,50,0],"font_size":28},
+      {"text":"Server room too hot!","color":[255,200,200],"font_size":14}
+    ],
+    "bg_color": [20,0,0],
+    "duration": 30,
+    "v_center": true
+  }'</pre>
+
+      <div class="section-title" style="margin-top:14px;">Clear alert</div>
+      <pre class="api-code">curl -X DELETE http://{{ request.host }}/api/v1/alert \
+  -H "Authorization: Bearer {{ api_key }}"</pre>
+
+      <div class="section-title" style="margin-top:14px;">Playlist skip</div>
+      <pre class="api-code">curl -X POST http://{{ request.host }}/api/v1/playlist/skip \
+  -H "Authorization: Bearer {{ api_key }}"</pre>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Line builder (mirrors edit_item.html) ──────────────────────────────────
+
+const FONTS = [
+  'FreeSans.ttf','FreeSansBold.ttf','FreeMono.ttf','FreeSerif.ttf',
+  'DejaVuSans.ttf','DejaVuSans-Bold.ttf','DejaVuSansMono.ttf'
+];
+
+function fontOptions(sel) {
+  return FONTS.map(f =>
+    `<option value="${f}" ${f===sel?'selected':''}>${f.replace('.ttf','')}</option>`
+  ).join('');
+}
+
+function posOptions(sel) {
+  const opts = [['','Auto stack'],['top','Top'],['center','Center'],
+    ['bottom','Bottom'],['top-left','Top Left'],['top-right','Top Right'],
+    ['bottom-left','Bottom Left'],['bottom-right','Bottom Right']];
+  return opts.map(([v,l])=>`<option value="${v}" ${v===sel?'selected':''}>${l}</option>`).join('');
+}
+
+function scrollOptions(sel) {
+  const opts = [['','Static'],['left','← Left'],['right','→ Right'],['up','↑ Up'],['down','↓ Down']];
+  return opts.map(([v,l])=>`<option value="${v}" ${v===sel?'selected':''}>${l}</option>`).join('');
+}
+
+function makeLine(cfg={}) {
+  const div = document.createElement('div');
+  div.className = 'line-block';
+  div.innerHTML = `
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Text</label>
+        <textarea name="line_text" rows="2"
+          style="width:100%;resize:vertical;font-family:monospace;font-size:13px;"
+          >${cfg.text||''}</textarea>
+      </div>
+      <div class="form-group">
+        <label>Font</label>
+        <select name="line_font">${fontOptions(cfg.font||'FreeSansBold.ttf')}</select>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+      <div class="form-group" style="margin:0; min-width:60px;">
+        <label>Size</label>
+        <input type="number" name="line_size" value="${cfg.font_size||20}" min="6" max="80">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Color</label>
+        <input type="color" name="line_color"
+               value="${rgbToHex(cfg.color||[255,50,50])}">
+      </div>
+      <div class="form-group" style="margin:0; min-width:80px;">
+        <label>Align</label>
+        <select name="line_align">
+          ${['center','left','right'].map(a=>`<option ${a===(cfg.align||'center')?'selected':''}>${a}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0; min-width:100px;">
+        <label>Position</label>
+        <select name="line_position">${posOptions(cfg.position||'')}</select>
+      </div>
+      <div class="form-group" style="margin:0; min-width:90px;">
+        <label>Scroll</label>
+        <select name="line_scroll">${scrollOptions(cfg.scroll||'')}</select>
+      </div>
+      <div style="padding-top:18px;">
+        <button type="button" class="btn btn-sm btn-danger"
+                onclick="removeLine(this)">✕</button>
+      </div>
+    </div>
+    <div style="margin-top:6px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+      <label style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:4px;">
+        Speed: <input type="number" name="line_scroll_speed"
+                      value="${cfg.scroll_speed||2}" min="0.1" max="50" step="0.1"
+                      style="width:55px;">
+      </label>
+      <label style="font-size:11px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" name="line_wrap" value="1"
+               ${cfg.wrap!==false?'checked':''}> Wrap
+      </label>
+      <label style="font-size:11px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:4px;">
+        <input type="checkbox" name="line_pixel_font" value="1"
+               ${cfg.pixel_font?'checked':''}> Pixel font
+      </label>
+    </div>`;
+  return div;
+}
+
+function addLine(cfg={}) {
+  document.getElementById('alert-lines').appendChild(makeLine(cfg));
+}
+
+function removeLine(btn) {
+  const blocks = document.querySelectorAll('#alert-lines .line-block');
+  if (blocks.length > 1) btn.closest('.line-block').remove();
+}
+
+function collectLines() {
+  return Array.from(document.querySelectorAll('#alert-lines .line-block')).map(b => {
+    const hx = b.querySelector('[name=line_color]').value.replace('#','');
+    return {
+      text:         b.querySelector('[name=line_text]').value,
+      font:         b.querySelector('[name=line_font]').value,
+      font_size:    parseInt(b.querySelector('[name=line_size]').value),
+      color:        [parseInt(hx.slice(0,2),16),parseInt(hx.slice(2,4),16),parseInt(hx.slice(4,6),16)],
+      align:        b.querySelector('[name=line_align]').value,
+      position:     b.querySelector('[name=line_position]').value || undefined,
+      scroll:       b.querySelector('[name=line_scroll]').value || false,
+      scroll_speed: parseFloat(b.querySelector('[name=line_scroll_speed]').value),
+      wrap:         b.querySelector('[name=line_wrap]').checked,
+      pixel_font:   b.querySelector('[name=line_pixel_font]').checked,
+    };
+  });
+}
+
+// ── Background helpers ──────────────────────────────────────────────────────
+
+function updateBgMode() {
+  const mode = document.getElementById('a-bg-mode').value;
+  document.getElementById('a-bg-color-row').style.display  = mode==='color'  ? '' : 'none';
+  document.getElementById('a-bg-image-row').style.display  = mode==='image'  ? '' : 'none';
+}
+
+function rgbToHex(arr) {
+  return '#' + arr.map(v => v.toString(16).padStart(2,'0')).join('');
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace('#','');
+  return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)];
+}
+
+// ── Send / clear ────────────────────────────────────────────────────────────
+
+function buildPayload() {
+  const mode   = document.getElementById('a-bg-mode').value;
+  const payload = {
+    duration:  parseInt(document.getElementById('a-dur').value),
+    v_center:  document.getElementById('a-vcenter').value === '1',
+    lines:     collectLines(),
+  };
+  if (mode === 'image') {
+    payload.bg_image = document.getElementById('a-bg-image').value;
+    payload.bg_dim   = parseInt(document.getElementById('a-bg-dim').value);
+  } else {
+    payload.bg_color = hexToRgb(document.getElementById('a-bg-color').value);
+  }
+  return payload;
+}
+
+function sendAlert() {
+  const body = buildPayload();
+  if (!body.lines.some(l => l.text.trim())) {
+    showFeedback('Please enter at least one line of text.', false);
+    return;
+  }
+  fetch('/api/v1/alert', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json',
+              'Authorization': 'Bearer {{ api_key }}'},
+    body:    JSON.stringify(body)
+  }).then(r=>r.json()).then(d => {
+    showFeedback(d.ok ? `Alert sent (${body.duration}s)` : d.error, d.ok);
+    refreshStatus();
+  }).catch(e => showFeedback('Error: '+e, false));
+}
+
+function clearAlert() {
+  fetch('/api/v1/alert', {
+    method:  'DELETE',
+    headers: {'Authorization': 'Bearer {{ api_key }}'}
+  }).then(r=>r.json()).then(d => {
+    showFeedback('Alert cleared.', true);
+    refreshStatus();
+  });
+}
+
+function showFeedback(msg, ok) {
+  const el = document.getElementById('alert-feedback');
+  el.style.color = ok ? 'var(--green)' : 'var(--red)';
+  el.textContent = msg;
+}
+
+// ── Status polling ──────────────────────────────────────────────────────────
+
+function refreshStatus() {
+  fetch('/api/v1/alert', {
+    headers: {'Authorization': 'Bearer {{ api_key }}'}
+  }).then(r=>r.json()).then(d => {
+    const info  = document.getElementById('alert-info');
+    const badge = document.getElementById('alert-status-badge');
+    const rem   = document.getElementById('badge-remaining');
+    if (d.active) {
+      info.style.color = 'var(--red)';
+      info.innerHTML   = `🚨 Alert active — <strong>${Math.round(d.remaining)}s</strong> remaining`;
+      badge.style.display = '';
+      rem.textContent  = Math.round(d.remaining);
+    } else {
+      info.style.color = 'var(--muted)';
+      info.textContent = '✓ No active alert — playlist playing normally';
+      badge.style.display = 'none';
+    }
+  }).catch(()=>{});
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+
+// Default: one red line
+addLine({text:'ALERT', font:'FreeSansBold.ttf', font_size:28,
+         color:[255,50,50], align:'center'});
+
+refreshStatus();
+setInterval(refreshStatus, 3000);
+</script>
+{% endblock %}
