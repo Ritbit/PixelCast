@@ -21,7 +21,7 @@ from .utils import load_background
 log = logging.getLogger('renderer.countdown')
 
 FONT_SEARCH = [
-    '/root/led-signage/fonts/',
+    '/opt/PixelCast/led-signage/fonts/',
     '/usr/share/fonts/truetype/freefont/',
     '/usr/share/fonts/truetype/dejavu/',
 ]

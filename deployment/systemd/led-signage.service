@@ -6,8 +6,8 @@ Wants=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/led-signage
-ExecStart=/usr/bin/python3 /root/led-signage/daemon.py
+WorkingDirectory=/opt/PixelCast/led-signage
+ExecStart=/usr/bin/python3 /opt/PixelCast/led-signage/daemon.py
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

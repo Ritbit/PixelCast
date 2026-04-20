@@ -36,15 +36,15 @@ Edit `/etc/systemd/system/led-signage.service`:
 Environment="SIGNAGE_SECRET=your-64-char-hex-string-here"
 
 # Existing configuration...
-WorkingDirectory=/root/led-signage
-ExecStart=/usr/bin/python3 /root/led-signage/daemon.py
+WorkingDirectory=/opt/PixelCast/led-signage
+ExecStart=/usr/bin/python3 /opt/PixelCast/led-signage/daemon.py
 ```
 
 ### 3. Backup Current Users File
 
 ```bash
 # Backup existing users (if any)
-sudo cp /root/led-signage/config/users.json /root/led-signage/config/users.json.backup
+sudo cp /opt/PixelCast/led-signage/config/users.json /opt/PixelCast/led-signage/config/users.json.backup
 ```
 
 ### 4. Review Nginx Configuration
@@ -53,10 +53,10 @@ If using nginx, verify the updated configuration:
 
 ```bash
 # Check the new config
-cat /root/led-signage/deployment/nginx/pixelcast.conf
+cat /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf
 
 # Update if needed
-sudo cp /root/led-signage/deployment/nginx/pixelcast.conf /etc/nginx/sites-available/led-signage
+sudo cp /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf /etc/nginx/sites-available/led-signage
 sudo nginx -t
 ```
 
@@ -73,7 +73,7 @@ sudo systemctl stop led-signage
 ### Step 2: Pull/Deploy New Code
 
 ```bash
-cd /root/led-signage
+cd /opt/PixelCast/led-signage
 git pull
 # OR
 # Extract from tarball, etc.
@@ -183,7 +183,7 @@ sudo systemctl start led-signage
 
 ```bash
 # Get your API key
-API_KEY=$(sudo cat /root/led-signage/config/users.json | grep api_key | cut -d'"' -f4)
+API_KEY=$(sudo cat /opt/PixelCast/led-signage/config/users.json | grep api_key | cut -d'"' -f4)
 
 # Test reboot endpoint (should require admin)
 curl -X POST http://localhost:5000/api/v1/system/reboot \
@@ -216,7 +216,7 @@ sudo journalctl -u led-signage -n 50 --no-pager
 
 ```bash
 # Check if users file exists
-ls -la /root/led-signage/config/users.json
+ls -la /opt/PixelCast/led-signage/config/users.json
 
 # If missing or empty, create first admin via web UI
 # If exists but can't log in, check logs:
@@ -262,12 +262,12 @@ If issues occur, you can rollback:
 sudo systemctl stop led-signage
 
 # Restore previous code
-cd /root
+cd /opt/PixelCast
 mv led-signage led-signage-new
 mv led-signage-backup led-signage
 
 # Restore users file
-cp /root/led-signage/config/users.json.backup /root/led-signage/config/users.json
+cp /opt/PixelCast/led-signage/config/users.json.backup /opt/PixelCast/led-signage/config/users.json
 
 # Remove SIGNAGE_SECRET requirement (old version)
 sudo nano /etc/systemd/system/led-signage.service

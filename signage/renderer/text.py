@@ -38,7 +38,7 @@ DEFAULT_FONT_SMALL = 'DejaVuSans.ttf'   # better hinting at small sizes
 LED_THRESHOLD    = 16    # px — use pixel rendering at or below this size
 
 FONT_SEARCH = [
-    '/root/led-signage/fonts/',
+    '/opt/PixelCast/led-signage/fonts/',
     '/usr/share/fonts/truetype/freefont/',
     '/usr/share/fonts/truetype/dejavu/',
     '/usr/share/fonts/truetype/',

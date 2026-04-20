@@ -27,9 +27,10 @@ step() { echo -e "\n${YELLOW}>>> $1${NC}"; }
 
 [ "$EUID" -ne 0 ] && fail "Run as root: sudo bash install.sh"
 
-INSTALL_DIR="/root"
+INSTALL_DIR="/opt/PixelCast"
 MATRIX_DIR="$INSTALL_DIR/rpi-rgb-led-matrix"
 SIGNAGE_DIR="$INSTALL_DIR/led-signage"
+mkdir -p "$INSTALL_DIR" "$MATRIX_DIR" "$SIGNAGE_DIR"
 
 # =============================================================================
 step "1. System update and dependencies"

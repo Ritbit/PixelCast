@@ -22,7 +22,7 @@ from .utils import load_background, parse_color
 log = logging.getLogger('renderer.clock')
 
 FONT_SEARCH = [
-    '/root/led-signage/fonts/',
+    '/opt/PixelCast/led-signage/fonts/',
     '/usr/share/fonts/truetype/freefont/',
     '/usr/share/fonts/truetype/dejavu/',
     '/usr/share/fonts/truetype/',

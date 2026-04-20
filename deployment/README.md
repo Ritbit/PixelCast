@@ -65,7 +65,7 @@ The service file (`systemd/led-signage.service`) configures:
 - Runs as root (required for GPIO access)
 - Auto-restart on failure
 - Starts after network is available
-- Working directory: `/root/led-signage`
+- Working directory: `/opt/PixelCast/led-signage`
 
 ## Nginx Configuration
 
@@ -103,13 +103,13 @@ Edit `config/panel.json` after installation to customize.
 sudo journalctl -u led-signage -n 50
 
 # Test manually
-sudo python3 /root/led-signage/daemon.py
+sudo python3 /opt/PixelCast/led-signage/daemon.py
 ```
 
 ### Display issues
 ```bash
 # Test hardware with demo
-sudo /root/rpi-rgb-led-matrix/examples-api-use/demo \
+sudo /opt/PixelCast/rpi-rgb-led-matrix/examples-api-use/demo \
   --led-gpio-mapping=regular --led-rows=64 --led-cols=128 \
   --led-chain=2 --led-parallel=2 --led-slowdown-gpio=4
 ```
@@ -131,7 +131,7 @@ To update an existing installation:
 sudo systemctl stop led-signage
 
 # Pull latest code
-cd /root/led-signage
+cd /opt/PixelCast/led-signage
 git pull
 
 # Restart service
@@ -150,6 +150,6 @@ sudo rm /etc/systemd/system/led-signage.service
 sudo systemctl daemon-reload
 
 # Remove installation (optional)
-sudo rm -rf /root/led-signage
-sudo rm -rf /root/rpi-rgb-led-matrix
+sudo rm -rf /opt/PixelCast/led-signage
+sudo rm -rf /opt/PixelCast/rpi-rgb-led-matrix
 ```

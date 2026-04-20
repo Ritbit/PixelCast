@@ -39,7 +39,7 @@
 ## Project File Structure
 
 ```
-/root/led-signage/
+/opt/PixelCast/led-signage/
 ├── daemon.py                    # Entry point — starts engine + web + scheduler
 ├── install.sh                   # Full redeploy script
 ├── led-signage.service          # Systemd unit file
@@ -169,7 +169,7 @@ renderer._done         → bool, set True when content complete (for auto-durati
   "bg_mode":          "color|corner|image",
   "bg_color":         [0, 0, 0],
   "bg_corner":        "top-left|top-right|bottom-left|bottom-right",
-  "bg_image":         "/root/led-signage/media/bg.jpg",
+  "bg_image":         "/opt/PixelCast/led-signage/media/bg.jpg",
   "bg_dim":           0,
   "bg_scale":         "cover|contain|stretch|custom",
   "bg_scale_factor":  1.0,
@@ -210,7 +210,7 @@ renderer._done         → bool, set True when content complete (for auto-durati
   },
 
   "image_gif": {
-    "file":         "/root/led-signage/media/image.png",
+    "file":         "/opt/PixelCast/led-signage/media/image.png",
     "scale_mode":   "fit|fill|stretch|custom",
     "scale_factor": 1.0,
     "position":     "center",
@@ -221,7 +221,7 @@ renderer._done         → bool, set True when content complete (for auto-durati
   },
 
   "video": {
-    "file":         "/root/led-signage/media/video.matrix.mp4",
+    "file":         "/opt/PixelCast/led-signage/media/video.matrix.mp4",
     "scale_mode":   "fit|fill|stretch",
     "loop":         true,
     "loop_mode":    "restart|pingpong",
@@ -239,7 +239,7 @@ renderer._done         → bool, set True when content complete (for auto-durati
     "forecast_days": 3,
     "show_humidity": true,
     "show_wind":     true,
-    "icon_dir":      "/root/led-signage/media/weather-icons",
+    "icon_dir":      "/opt/PixelCast/led-signage/media/weather-icons",
     "font":          "FreeSansBold.ttf",
     "font_regular":  "FreeSans.ttf",
     "font_size_big": null,
@@ -396,7 +396,7 @@ API key: shown in Settings, stored in `config/users.json` as `"api_key"`
      "scroll": "left", "scroll_speed": 2.0, "wrap": true}
   ],
   "bg_color": [20, 0, 0],
-  "bg_image": "/root/led-signage/media/bg.jpg",
+  "bg_image": "/opt/PixelCast/led-signage/media/bg.jpg",
   "bg_dim": 40,
   "v_center": true,
   "duration": 30
@@ -486,7 +486,7 @@ Cache key includes size, scale, factor, offsets, dim — stored as `.bgcache_HAS
 
 ## Weather Icons
 
-Extracted from a PNG sprite sheet into `/root/led-signage/media/weather-icons/`.
+Extracted from a PNG sprite sheet into `/opt/PixelCast/led-signage/media/weather-icons/`.
 Named by WMO code: `0.png`, `2.png`, `61.png` etc.
 Renderer tries `{code}.png` then `{icon_key}.png`, falls back to built-in geometric icon.
 15-minute refresh interval from Open-Meteo (no API key required).
@@ -540,7 +540,7 @@ Must remove + recreate the `<img>` element to force new TCP connection.
 ### Font search order
 ```python
 FONT_SEARCH = [
-    '/root/led-signage/fonts/',
+    '/opt/PixelCast/led-signage/fonts/',
     '/usr/share/fonts/truetype/freefont/',
     '/usr/share/fonts/truetype/dejavu/',
     '/usr/share/fonts/truetype/',
@@ -557,13 +557,13 @@ Always `[R, G, B]` lists (0–255). `parse_color()` in `utils.py` handles lists,
 
 ```bash
 # Deploy on Pi
-cd /root && tar -xzf led-signage.tar.gz && sudo systemctl restart led-signage
+cd /opt/PixelCast && tar -xzf led-signage.tar.gz && sudo systemctl restart led-signage
 
 # Watch logs
 journalctl -u led-signage -f
 
 # Manual debug run
-sudo python3 /root/led-signage/daemon.py
+sudo python3 /opt/PixelCast/led-signage/daemon.py
 ```
 
 **Before packaging, always:**

@@ -3,7 +3,7 @@
 ## Your role
 
 You are continuing development of a working Raspberry Pi LED matrix signage
-system. The codebase is at `/root/led-signage/` on the target Pi, but you
+system. The codebase is at `/opt/PixelCast/led-signage/` on the target Pi, but you
 should read the actual files before making changes — do not assume file
 contents from this document alone, as the document describes the state at the
 end of the previous session and minor drifts may have occurred.
@@ -25,7 +25,7 @@ features one at a time, testing each before moving to the next.
 | GPIO mapping | `regular` (never `adafruit-hat`) |
 | OS | Raspberry Pi OS Lite 64-bit, Bookworm/Debian 13 |
 | Python | 3.13 |
-| Display driver | hzeller/rpi-rgb-led-matrix at `/root/rpi-rgb-led-matrix/` |
+| Display driver | hzeller/rpi-rgb-led-matrix at `/opt/PixelCast/rpi-rgb-led-matrix/` |
 
 **Working panel flags** (always use these unless explicitly changing them):
 ```
@@ -40,21 +40,21 @@ features one at a time, testing each before moving to the next.
 
 Read these files in order before writing any code:
 
-1. `/root/led-signage/signage/matrix.py` — display loop, transition logic,
+1. `/opt/PixelCast/led-signage/signage/matrix.py` — display loop, transition logic,
    `prev_wipeout_target` anti-double-show mechanism
-2. `/root/led-signage/signage/renderer/base.py` — BaseRenderer ABC
-3. `/root/led-signage/signage/renderer/video.py` — current video renderer
-4. `/root/led-signage/signage/web/routes.py` — all Flask routes
-5. `/root/led-signage/signage/web/templates/base.html` — nav, CSS design system
-6. `/root/led-signage/signage/web/filters.py` — custom Jinja2 filters
-7. `/root/led-signage/config/panel.json` — current hardware config
+2. `/opt/PixelCast/led-signage/signage/renderer/base.py` — BaseRenderer ABC
+3. `/opt/PixelCast/led-signage/signage/renderer/video.py` — current video renderer
+4. `/opt/PixelCast/led-signage/signage/web/routes.py` — all Flask routes
+5. `/opt/PixelCast/led-signage/signage/web/templates/base.html` — nav, CSS design system
+6. `/opt/PixelCast/led-signage/signage/web/filters.py` — custom Jinja2 filters
+7. `/opt/PixelCast/led-signage/config/panel.json` — current hardware config
 
 ---
 
 ## Project structure
 
 ```
-/root/led-signage/
+/opt/PixelCast/led-signage/
 ├── daemon.py                    # Entry: starts MatrixEngine + Scheduler + Flask
 ├── install.sh
 ├── led-signage.service          # Systemd unit
@@ -283,7 +283,7 @@ Endpoint: `https://api.open-meteo.com/v1/forecast`
   "units": "celsius",
   "forecast_days": 1,
   "bg_color": [0, 0, 30],
-  "bg_image": "/root/led-signage/media/weather-bg.jpg",
+  "bg_image": "/opt/PixelCast/led-signage/media/weather-bg.jpg",
   "text_color": [255, 255, 255],
   "accent_color": [100, 180, 255],
   "update_interval": 600
@@ -393,7 +393,7 @@ New playlist item type: `countdown`.
   "label": "Until Christmas",
   "finished_text": "🎄 Merry Christmas!",
   "bg_color": [0, 0, 20],
-  "bg_image": "/root/led-signage/media/xmas-bg.jpg",
+  "bg_image": "/opt/PixelCast/led-signage/media/xmas-bg.jpg",
   "number_color": [255, 220, 0],
   "label_color": [200, 200, 255],
   "show_seconds": false

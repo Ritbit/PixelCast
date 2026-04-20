@@ -260,7 +260,7 @@ Default credentials: `admin` / `admin` — **change immediately after first logi
 ### Running Manually
 
 ```bash
-sudo python3 /root/led-signage/daemon.py
+sudo python3 /opt/PixelCast/led-signage/daemon.py
 ```
 
 ### Watching Logs
