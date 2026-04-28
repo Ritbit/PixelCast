@@ -39,6 +39,7 @@ apt-get update
 apt-get install -y \
     git build-essential pkg-config \
     python3 python3-pip python3-dev \
+    python3-flask python3-flask-login python3-wtf \
     python3-pillow python3-numpy \
     ffmpeg \
     libavcodec-dev libavformat-dev libswscale-dev \
@@ -101,7 +102,9 @@ log "Python bindings installed"
 # =============================================================================
 step "6. Install Python signage dependencies"
 # =============================================================================
-pip3 install --break-system-packages flask flask-login pillow numpy av
+# Flask, Flask-Login, Flask-WTF, Pillow, NumPy installed via apt
+# Only install PyAV via pip (not available in apt)
+pip3 install --break-system-packages av
 log "Python signage packages installed"
 
 # =============================================================================
@@ -114,11 +117,12 @@ else
     log "Signage system found at $SIGNAGE_DIR"
 fi
 
-# Create directory structure
-mkdir -p "$SIGNAGE_DIR"/{media,fonts,config,signage/web/templates,signage/web/static}
+# Create directory structure (config and media at PixelCast level, not inside led-signage)
+mkdir -p "$INSTALL_DIR"/{config,media}
+mkdir -p "$SIGNAGE_DIR"/{fonts,signage/web/templates,signage/web/static}
 
 # Panel config (only if not existing)
-PANEL_CFG="$SIGNAGE_DIR/config/panel.json"
+PANEL_CFG="$INSTALL_DIR/config/panel.json"
 if [ ! -f "$PANEL_CFG" ]; then
 cat > "$PANEL_CFG" << 'EOF'
 {
@@ -146,10 +150,16 @@ SERVICE_SRC="$SIGNAGE_DIR/deployment/systemd/led-signage.service"
 SERVICE_DST="/etc/systemd/system/led-signage.service"
 
 if [ -f "$SERVICE_SRC" ]; then
+    # Generate random secret key for Flask session security
+    SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+    
+    # Copy service file and replace placeholder with actual secret
     cp "$SERVICE_SRC" "$SERVICE_DST"
+    sed -i "s/CHANGE_THIS_TO_A_RANDOM_SECRET_KEY/$SECRET_KEY/" "$SERVICE_DST"
+    
     systemctl daemon-reload
     systemctl enable led-signage
-    log "Systemd service installed and enabled"
+    log "Systemd service installed and enabled with generated secret key"
 else
     warn "Service file not found at $SERVICE_SRC — skipping systemd setup"
 fi
