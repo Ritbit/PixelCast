@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="140" viewBox="0 0 480 140">
+  <title>PixelCast Logo – Adaptive (light/dark)</title>
+  <defs>
+    <style>
+      .wm-primary { fill: #111111; }
+      .wm-secondary { fill: #555555; }
+      @media (prefers-color-scheme: dark) {
+        .wm-primary { fill: #ffffff; }
+        .wm-secondary { fill: #888888; }
+      }
+    </style>
+  </defs>
+
+  <!-- 5x5 LED dot grid -->
+  <g transform="translate(10, 18)">
+    <circle cx="0"  cy="0"  r="7" fill="#378ADD"/>
+    <circle cx="22" cy="0"  r="7" fill="#378ADD"/>
+    <circle cx="44" cy="0"  r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="66" cy="0"  r="7" fill="#378ADD"/>
+    <circle cx="88" cy="0"  r="7" fill="#378ADD"/>
+
+    <circle cx="0"  cy="22" r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="22" cy="22" r="7" fill="#378ADD"/>
+    <circle cx="44" cy="22" r="7" fill="#378ADD"/>
+    <circle cx="66" cy="22" r="7" fill="#378ADD"/>
+    <circle cx="88" cy="22" r="7" fill="#B5D4F4" opacity="0.45"/>
+
+    <circle cx="0"  cy="44" r="7" fill="#378ADD"/>
+    <circle cx="22" cy="44" r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="44" cy="44" r="7" fill="#378ADD"/>
+    <circle cx="66" cy="44" r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="88" cy="44" r="7" fill="#378ADD"/>
+
+    <circle cx="0"  cy="66" r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="22" cy="66" r="7" fill="#378ADD"/>
+    <circle cx="44" cy="66" r="7" fill="#378ADD"/>
+    <circle cx="66" cy="66" r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="88" cy="66" r="7" fill="#378ADD"/>
+
+    <circle cx="0"  cy="88" r="7" fill="#378ADD"/>
+    <circle cx="22" cy="88" r="7" fill="#378ADD"/>
+    <circle cx="44" cy="88" r="7" fill="#B5D4F4" opacity="0.45"/>
+    <circle cx="66" cy="88" r="7" fill="#378ADD"/>
+    <circle cx="88" cy="88" r="7" fill="#378ADD"/>
+  </g>
+
+  <!-- Signal arcs -->
+  <path d="M 120,63 Q 135,43 135,63 Q 135,83 120,63" fill="none" stroke="#378ADD" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+  <path d="M 120,63 Q 150,28 150,63 Q 150,98 120,63" fill="none" stroke="#378ADD" stroke-width="2.5" stroke-linecap="round" opacity="0.65"/>
+  <path d="M 120,63 Q 168,11 168,63 Q 168,115 120,63" fill="none" stroke="#378ADD" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+
+  <!-- Wordmark – adaptive color -->
+  <text x="188" y="82" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="500" font-size="48px" class="wm-primary">Pixel<tspan fill="#378ADD">Cast</tspan></text>
+  <text x="190" y="108" font-family="'Helvetica Neue', Arial, sans-serif" font-weight="400" font-size="12px" class="wm-secondary" letter-spacing="3">LED MATRIX SIGNAGE</text>
+</svg>

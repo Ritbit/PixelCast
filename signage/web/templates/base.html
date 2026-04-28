@@ -6,10 +6,10 @@
   <title>{% block title %}PixelCast{% endblock %}</title>
   
   <!-- Favicons -->
-  <link rel="icon" type="image/svg+xml" href="{{ url_for('main.brand', filename='pixelcast-favicon-32.svg') }}">
-  <link rel="icon" type="image/svg+xml" sizes="16x16" href="{{ url_for('main.brand', filename='pixelcast-favicon-16.svg') }}">
-  <link rel="icon" type="image/svg+xml" sizes="32x32" href="{{ url_for('main.brand', filename='pixelcast-favicon-32.svg') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('main.brand', filename='pixelcast-icon-512.svg') }}">
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/pixelcast-favicon-32.svg') }}">
+  <link rel="icon" type="image/svg+xml" sizes="16x16" href="{{ url_for('static', filename='brand/pixelcast-favicon-16.svg') }}">
+  <link rel="icon" type="image/svg+xml" sizes="32x32" href="{{ url_for('static', filename='brand/pixelcast-favicon-32.svg') }}">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='brand/pixelcast-icon-512.svg') }}">
   <style>
     :root {
       --bg:      #0f1117;
@@ -183,7 +183,7 @@
 {% if current_user.is_authenticated %}
 <nav>
   <a class="nav-brand" href="{{ url_for('main.index') }}">
-    <img src="{{ url_for('main.brand', filename='pixelcast-icon-48.svg') }}" alt="PixelCast">
+    <img src="{{ url_for('static', filename='brand/pixelcast-icon-48.svg') }}" alt="PixelCast">
     <span>PixelCast</span>
   </a>
   <a class="nav-link {% if request.endpoint == 'main.index' %}active{% endif %}"
