@@ -53,6 +53,7 @@
   <div class="card-title">Upload Files</div>
   <form method="post" action="{{ url_for('files.upload') }}"
         enctype="multipart/form-data" id="upload-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="upload-zone" id="upload-zone"
          onclick="document.getElementById('file-input').click()"
          ondragover="handleDragOver(event)"
@@ -146,6 +147,7 @@
               action="{{ url_for('files.delete', filename=f.name) }}"
               style="display:inline; margin-left:auto;"
               onsubmit="return confirm('Delete {{ f.name }}?')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button class="btn btn-sm btn-danger" title="Delete">✕</button>
         </form>
       </div>
@@ -166,6 +168,8 @@
 
 {% block scripts %}
 <script>
+const csrfToken = '{{ csrf_token() }}';
+
 // ---- Drag & drop upload ----
 function handleDragOver(e) {
   e.preventDefault();
@@ -229,7 +233,10 @@ function transcodeFile(filename, btn) {
   btn.textContent = '⏳';
   btn.title       = 'Optimising…';
 
-  fetch(`/files/transcode/${encodeURIComponent(filename)}`, {method:'POST'})
+  fetch(`/files/transcode/${encodeURIComponent(filename)}`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  })
     .then(r => r.json())
     .then(data => {
       if (data.already_done) {

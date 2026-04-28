@@ -151,6 +151,7 @@
 {% block scripts %}
 <script>
 let testTimer = null;
+const csrfToken = '{{ csrf_token() }}';
 
 function sendTest(type, param, event) {
   document.querySelectorAll('.test-btn').forEach(b => b.classList.remove('active'));
@@ -162,7 +163,10 @@ function sendTest(type, param, event) {
 
   fetch('/control/screentest', {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken
+    },
     body: JSON.stringify({type, param, duration: dur})
   })
   .then(r => r.json())
@@ -180,7 +184,10 @@ function sendTest(type, param, event) {
 }
 
 function stopTest() {
-  fetch('/control/screentest/stop', {method:'POST'})
+  fetch('/control/screentest/stop', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  })
     .then(() => {
       document.getElementById('test-status').textContent = 'Playlist resumed';
       document.querySelectorAll('.test-btn').forEach(b => b.classList.remove('active'));

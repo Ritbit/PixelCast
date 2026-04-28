@@ -30,6 +30,7 @@
   </div>
 
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="save_panel">
 
     <!-- Display geometry -->
@@ -299,6 +300,7 @@
         </td>
         <td style="padding:8px;">
           <form method="post" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="change_role">
             <input type="hidden" name="target_user" value="{{ username }}">
             <select name="new_role" onchange="this.form.submit()"
@@ -316,6 +318,7 @@
           <!-- Delete (not self, not last admin) -->
           {% if username != current_user.id %}
           <form method="post" onsubmit="return confirmUserDelete(this)" data-username="{{ username | e }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="delete_user">
             <input type="hidden" name="target_user" value="{{ username | e }}">
             <button class="btn btn-sm btn-danger" type="submit">✕ Delete</button>
@@ -327,6 +330,7 @@
       <tr id="reset-pw-{{ username }}" style="display:none; background:var(--surface);">
         <td colspan="3" style="padding:10px 8px;">
           <form method="post" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="reset_password">
             <input type="hidden" name="target_user" value="{{ username }}">
             <input type="password" name="new_password" placeholder="New password"
@@ -344,6 +348,7 @@
   <!-- Add user -->
   <div class="section-title">Add User</div>
   <form method="post" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="add_user">
     <div class="form-group" style="margin:0; flex:1; min-width:130px;">
       <label>Username</label>
@@ -387,6 +392,7 @@
       </p>
     </div>
     <form method="post" style="padding-top:18px;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="regenerate_api_key">
       <button class="btn btn-sm btn-secondary"
               onclick="return confirm('Regenerate API key? All existing integrations must be updated.')">
@@ -417,6 +423,7 @@
       <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Restore</div>
       <form method="post" action="{{ url_for('system.restore') }}"
             enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input type="file" name="backup_file" accept=".zip"
                  style="flex:1; background:var(--surface); border:1px solid var(--border);
@@ -475,6 +482,7 @@
   <div class="card">
     <div class="card-title">Change Password</div>
     <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <input type="hidden" name="action" value="change_password">
       <div class="form-group">
         <label>Current Password</label>
@@ -540,6 +548,8 @@ function setRefresh(hz) {
   return false;
 }
 
+const csrfToken = '{{ csrf_token() }}';
+
 function sysAction(url, confirmMsg) {
   if (!confirm(confirmMsg)) return;
   const msg = document.getElementById('sys-msg');
@@ -547,7 +557,10 @@ function sysAction(url, confirmMsg) {
   msg.style.color   = 'var(--muted)';
   msg.textContent   = 'Sending command...';
 
-  fetch(url, {method: 'POST'})
+  fetch(url, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  })
     .then(r => r.json())
     .then(data => {
       msg.textContent = data.message || 'Done.';

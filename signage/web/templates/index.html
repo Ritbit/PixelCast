@@ -316,6 +316,8 @@ canvas.spark {
 
 {% block scripts %}
 <script>
+const csrfToken = '{{ csrf_token() }}';
+
 // ---- Preview ----
 let previewActive = true;
 
@@ -374,7 +376,10 @@ function updateBrightness(val) {
   briTimer = setTimeout(() => {
     fetch('/control/brightness', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
       body: JSON.stringify({value: parseInt(val)})
     });
   }, 300);
@@ -382,7 +387,10 @@ function updateBrightness(val) {
 
 // ---- Control buttons ----
 function doControl(url) {
-  fetch(url, {method: 'POST'}).then(r => r.json()).then(() => {
+  fetch(url, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  }).then(r => r.json()).then(() => {
     if (url.includes('pause')) refreshStatus();
   });
 }
@@ -535,7 +543,10 @@ setInterval(fetchStats, 5000);
 // ---- System actions (restart/poweroff) ----
 function sysAction(url, msg) {
   if (!confirm(msg)) return;
-  fetch(url, {method: 'POST'})
+  fetch(url, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  })
     .then(r => r.json())
     .catch(() => {});   // connection drop on restart is expected
 }

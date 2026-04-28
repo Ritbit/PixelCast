@@ -13,6 +13,7 @@
 import os
 import logging
 from flask import Flask
+from flask_wtf.csrf import CSRFProtect
 from .auth import init_auth
 from .filters import register_filters
 
@@ -31,6 +32,8 @@ def create_app(engine, playlist, scheduler, media_dir, users_path, alert_manager
         raise RuntimeError('SIGNAGE_SECRET must be set for security. Refusing to start.')
     app.secret_key = secret_key
     app.config['MAX_CONTENT_LENGTH'] = 512 * 1024 * 1024
+    
+    csrf = CSRFProtect(app)
     app.config['MEDIA_DIR']    = os.path.abspath(media_dir)
     app.config['USERS_PATH']   = users_path
     app.config['ENGINE']       = engine
@@ -57,6 +60,7 @@ def create_app(engine, playlist, scheduler, media_dir, users_path, alert_manager
     import signage.web.api as _api_mod
     _api_mod._USERS_PATH = users_path
     app.register_blueprint(api_bp, url_prefix='/api/v1')
+    csrf.exempt(api_bp)
 
     register_error_handlers(app)
     log.info("Flask app created")

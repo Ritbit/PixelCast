@@ -99,6 +99,7 @@
   </div>
 
   <form method="post" action="{{ url_for('playlist.add') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="type" id="f-type" value="clock">
 
     <div class="grid-2">
@@ -297,6 +298,7 @@
       <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Import</div>
       <form method="post" action="{{ url_for('playlist.import_playlist') }}"
             enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input type="file" name="import_file"
                  accept=".json,.zip"
@@ -371,19 +373,23 @@
                href="{{ url_for('playlist.edit', item_id=item.id) }}">✏️</a>
             <form method="post" action="{{ url_for('playlist.move', item_id=item.id, direction='up') }}"
                   style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-secondary btn-icon">↑</button>
             </form>
             <form method="post" action="{{ url_for('playlist.move', item_id=item.id, direction='down') }}"
                   style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-secondary btn-icon">↓</button>
             </form>
             <form method="post" action="{{ url_for('playlist.duplicate', item_id=item.id) }}"
                   style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-secondary btn-icon" title="Duplicate">⧉</button>
             </form>
             <form method="post" action="{{ url_for('playlist.delete', item_id=item.id) }}"
                   style="display:inline;"
                   onsubmit="return confirm('Delete this item?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button class="btn btn-sm btn-danger btn-icon">✕</button>
             </form>
           </div>
@@ -402,6 +408,8 @@
 
 {% block scripts %}
 <script>
+const csrfToken = '{{ csrf_token() }}';
+
 // Jinja basename filter workaround
 // (handled server-side via custom filter or just split)
 
@@ -477,7 +485,10 @@ if (tbody) {
     const ids = [...tbody.querySelectorAll('tr[data-id]')].map(r => r.dataset.id);
     fetch('{{ url_for("playlist.reorder") }}', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': csrfToken
+      },
       body: JSON.stringify({ids})
     });
   });
