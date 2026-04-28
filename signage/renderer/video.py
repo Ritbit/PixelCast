@@ -29,7 +29,7 @@ class VideoRenderer(BaseRenderer):
                  lightweight: bool = False):
         super().__init__(item, width, height)
         from signage.transcoder import resolve_video_path as _rvp
-        self._path         = _rvp(item.get('file', ''))
+        self._path         = _rvp(item.get('file', ''), item)
         self._scale_mode   = item.get('scale_mode', item.get('scale', 'fit'))
         self._scale_factor = float(item.get('scale_factor', 1.0))
         self._position     = item.get('position', 'center')

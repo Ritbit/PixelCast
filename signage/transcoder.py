@@ -204,11 +204,37 @@ def transcode_async(path: str, display_width: int, display_height: int,
     return t
 
 
-def resolve_video_path(path: str) -> str:
+def resolve_video_path(path: str, item: dict = None) -> str:
     """
     Return the best version of a video to play.
-    Uses the transcoded .matrix.mp4 if it exists, otherwise original.
+    
+    If a custom background is configured (non-black color, image, or corner sample),
+    use the original video to allow runtime compositing with the background.
+    Otherwise, use the transcoded .matrix.mp4 for optimal performance.
+    
+    Args:
+        path: Original video file path
+        item: Playlist item dict (optional, to check background settings)
+    
+    Returns:
+        Path to the video file to use (original or transcoded)
     """
+    # Check if custom background is configured
+    if item:
+        bg_mode = item.get('bg_mode', 'color')
+        bg_color = item.get('bg_color', [0, 0, 0])
+        
+        # Use original if:
+        # - Background mode is 'image' or 'corner' (requires runtime compositing)
+        # - Background color is not black (requires custom padding color)
+        if bg_mode in ('image', 'corner'):
+            log.debug(f"Using original video for bg_mode={bg_mode}")
+            return path
+        if bg_color != [0, 0, 0]:
+            log.debug(f"Using original video for custom bg_color={bg_color}")
+            return path
+    
+    # Use transcoded version if available (black background, optimized)
     mp = matrix_path(path)
     if os.path.exists(mp):
         return mp
