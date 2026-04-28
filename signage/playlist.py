@@ -277,7 +277,8 @@ class PlaylistManager:
             item.setdefault('bg_color', [0, 0, 0])
             item.setdefault('scroll', False)
         elif t in ('image', 'gif', 'video'):
-            pass  # file is required
+            item.setdefault('bg_color', [0, 0, 0])
+            item.setdefault('bg_mode', 'color')
         return item
 
     def resolve_transition(self, name: str) -> str:
