@@ -48,7 +48,7 @@
 
 1. **Clone or download** the project to your Raspberry Pi:
    ```bash
-   cd /root
+   cd /opt/PixelCast
    git clone <repository-url> led-signage
    cd led-signage
    ```
@@ -59,42 +59,46 @@
    ```
 
    This will:
-   - Install system dependencies
-   - Build RGB matrix library
+   - Install system dependencies (Python, ffmpeg, Nginx)
+   - Build RGB matrix library (hzeller/rpi-rgb-led-matrix)
    - Install Python packages
-   - Configure systemd service
-   - Set up directory structure
-   - Configure hardware (disable audio, etc.)
+   - Configure systemd service with auto-generated secret key
+   - Set up directory structure (`/opt/PixelCast/{config,media}`)
+   - Configure hardware (disable audio to avoid PWM conflicts)
 
 3. **Access the web interface**:
    - Open `http://<raspberry-pi-ip>` in your browser
    - Default credentials: `admin` / `admin` (change immediately!)
 
-### Manual Deployment
+### Deployment & Updates
 
-For updates or redeployment:
+For updates from your development machine:
 
 ```bash
-cd /root && tar -xzf led-signage.tar.gz
-sudo systemctl restart led-signage
+cd /path/to/pixelcast
+./deploy.sh
 ```
+
+This deploys code to `/opt/PixelCast/led-signage` while preserving config and media.
+
+See [DEPLOY_INSTRUCTIONS.md](DEPLOY_INSTRUCTIONS.md) for detailed deployment guide.
 
 ---
 
-## Project Structure
+## Directory Structure
 
+### Development (Repository)
 ```
 pixelcast/
 ├── daemon.py                    # Main entry point
 ├── requirements.txt             # Python dependencies
-├── Deploy_from_Download.sh      # Development deployment helper
+├── deploy.sh                    # Deployment script
 ├── README.md                    # This file
 │
 ├── docs/                        # 📚 Documentation
 │   ├── DOCUMENTATION_GUIDE.md   # Code documentation standards
-│   ├── CLAUDE_PROJECT_CONTEXT.md # Project context
-│   ├── CLAUDE_PROJECT_QUICKREF.md # Quick reference
-│   └── FEATURES.md              # Feature list and roadmap
+│   ├── FEATURES.md              # Feature list and roadmap
+│   └── STRUCTURE.md             # Project structure guide
 │
 ├── deployment/                  # 🚀 Deployment files
 │   ├── install.sh               # Installation script

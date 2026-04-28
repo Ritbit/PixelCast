@@ -66,6 +66,24 @@ The service file (`systemd/led-signage.service`) configures:
 - Auto-restart on failure
 - Starts after network is available
 - Working directory: `/opt/PixelCast/led-signage`
+- **SIGNAGE_SECRET**: Flask session secret key (auto-generated during install)
+
+### Manual Secret Key Setup
+
+If installing manually, generate a secret key and update the service file:
+
+```bash
+# Generate a random secret key
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Edit the service file
+sudo nano /etc/systemd/system/led-signage.service
+
+# Replace CHANGE_THIS_TO_A_RANDOM_SECRET_KEY with your generated key
+# Then reload systemd
+sudo systemctl daemon-reload
+sudo systemctl restart led-signage
+```
 
 ## Nginx Configuration
 
