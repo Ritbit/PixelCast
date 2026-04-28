@@ -347,11 +347,11 @@ def add():
             })
         data['lines'] = lines
 
-    # Attach file path for media items
+    # Attach file path for media items (use relative path for data separation)
     if data.get('type') in ('image', 'gif', 'video'):
         fname = data.pop('media_file', '')
         if fname:
-            data['file'] = os.path.join(current_app.config['MEDIA_DIR'], fname)
+            data['file'] = os.path.join('media', fname)
 
     item = playlist.add_item(data)
     current_app.config['ENGINE'].reload_playlist()
@@ -1222,11 +1222,11 @@ def import_playlist():
                 with zf.open('playlist.json') as pf:
                     items = json.load(pf)
 
-            # Fix file paths to point to local media dir
+            # Fix file paths to use relative paths (media/filename)
             for item in items:
                 if item.get('file'):
                     item['file'] = os.path.join(
-                        media_dir, os.path.basename(item['file']))
+                        'media', os.path.basename(item['file']))
 
         else:
             # Plain JSON
