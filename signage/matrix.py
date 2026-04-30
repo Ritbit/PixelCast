@@ -25,6 +25,31 @@ from PIL import Image
 
 log = logging.getLogger('matrix')
 
+
+def _thread_ids():
+    """Return the set of all TIDs in the current process (Linux only)."""
+    try:
+        return {int(t) for t in os.listdir(f'/proc/{os.getpid()}/task')}
+    except OSError:
+        return set()
+
+
+def _pin_new_threads(tids_before, cpu=3):
+    """Pin threads created after tids_before snapshot to a specific CPU core.
+
+    Used to move the C++ rgbmatrix refresh thread(s) onto the isolated core
+    while leaving the Python/Flask threads on the general-purpose cores.
+    Requires root. Silently skips on non-Linux or if affinity call fails.
+    """
+    new_tids = _thread_ids() - tids_before
+    for tid in new_tids:
+        try:
+            os.sched_setaffinity(tid, {cpu})
+            log.info(f"Matrix refresh thread {tid} pinned to CPU core {cpu}")
+        except (OSError, AttributeError) as e:
+            log.debug(f"Could not pin thread {tid} to core {cpu}: {e}")
+
+
 # Types that produce a static first frame — safe to pre-render in background
 STATIC_TYPES = {'image', 'gif', 'clock', 'text', 'countdown', 'weather'}
 
@@ -166,7 +191,9 @@ class MatrixEngine:
         pixel_mapper = self.cfg.get('pixel_mapper', '')
         if pixel_mapper:
             options.pixel_mapper_config = pixel_mapper
+        tids_before = _thread_ids()
         m = RGBMatrix(options=options)
+        _pin_new_threads(tids_before, cpu=3)
         log.info("RGBMatrix hardware initialised")
         return m
 
