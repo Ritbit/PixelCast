@@ -39,8 +39,8 @@ apt-get update
 apt-get install -y \
     git build-essential pkg-config \
     python3 python3-pip python3-dev \
-    python3-flask python3-flask-login python3-wtf \
-    python3-pillow python3-numpy \
+    python3-flask python3-flask-login \
+    python3-pil python3-numpy \
     ffmpeg \
     libavcodec-dev libavformat-dev libswscale-dev \
     libavdevice-dev libavutil-dev \
@@ -96,15 +96,17 @@ fi
 # =============================================================================
 step "5. Install Python bindings"
 # =============================================================================
-pip3 install --break-system-packages -e "$MATRIX_DIR/bindings/python"
+# The hZeller bindings must be compiled via make (no setup.py/pyproject.toml)
+make -C "$MATRIX_DIR/bindings/python" build-python PYTHON="$(which python3)"
+make -C "$MATRIX_DIR/bindings/python" install-python PYTHON="$(which python3)"
 log "Python bindings installed"
 
 # =============================================================================
 step "6. Install Python signage dependencies"
 # =============================================================================
-# Flask, Flask-Login, Flask-WTF, Pillow, NumPy installed via apt
-# Only install PyAV via pip (not available in apt)
-pip3 install --break-system-packages av
+# Flask, Flask-Login, Pillow, NumPy installed via apt above
+# Flask-WTF and PyAV are not reliably available in apt — install via pip
+pip3 install --break-system-packages flask-wtf av
 log "Python signage packages installed"
 
 # =============================================================================
@@ -126,6 +128,7 @@ PANEL_CFG="$INSTALL_DIR/config/panel.json"
 if [ ! -f "$PANEL_CFG" ]; then
 cat > "$PANEL_CFG" << 'EOF'
 {
+    "board_type": "electrodragon-rpi4",
     "gpio_mapping": "regular",
     "rows": 64,
     "cols": 128,
