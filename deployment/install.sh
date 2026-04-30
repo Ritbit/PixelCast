@@ -74,6 +74,20 @@ if [ -d "$MATRIX_DIR" ]; then
 else
     git clone https://github.com/hzeller/rpi-rgb-led-matrix.git "$MATRIX_DIR"
 fi
+
+# Apply Pi 5 / RP1 support patch (PR #1886 — not yet merged in main branch)
+# Fetch the PR branch and cherry-pick the single Pi5 commit
+git -C "$MATRIX_DIR" fetch origin pull/1886/head:pr-pi5-fix 2>/dev/null || warn "Could not fetch PR #1886 (offline?)"
+if git -C "$MATRIX_DIR" cat-file -e pr-pi5-fix 2>/dev/null; then
+    ALREADY=$(git -C "$MATRIX_DIR" log --oneline | grep -c "Raspberry Pi5" || true)
+    if [ "$ALREADY" -eq 0 ]; then
+        git -C "$MATRIX_DIR" \
+            -c user.email="install@localhost" -c user.name="Installer" \
+            cherry-pick pr-pi5-fix && log "Pi 5 patch applied" || warn "Pi 5 patch failed — may already be applied"
+    else
+        log "Pi 5 patch already applied"
+    fi
+fi
 log "rpi-rgb-led-matrix ready"
 
 # =============================================================================
