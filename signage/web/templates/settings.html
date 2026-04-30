@@ -69,9 +69,7 @@
           <input type="text" name="colorlight_ip"
                  value="{{ panel_cfg.get('colorlight_ip','192.168.0.20') }}"
                  placeholder="192.168.0.20">
-          <div class="setting-desc">
-            Static IP assigned to the 5A-75B. Set via ColorLight Studio.
-          </div>
+          <div class="setting-desc">Static IP on the same subnet as the Pi.</div>
         </div>
         <div class="form-group">
           <label>UDP port</label>
@@ -80,16 +78,42 @@
                  min="1" max="65535">
           <div class="setting-desc">Default: 7000</div>
         </div>
+        <div class="form-group">
+          <label>Scan lines</label>
+          <input type="number" name="colorlight_scan_lines"
+                 value="{{ panel_cfg.get('colorlight_scan_lines', panel_cfg.get('rows',64)//2) }}"
+                 min="1" max="64">
+          <div class="setting-desc">
+            rows ÷ 2  for 1/32 scan (32 for 64-row panels)
+          </div>
+        </div>
+        <div class="form-group">
+          <label>HUB75 ports used</label>
+          <input type="number" name="colorlight_ports"
+                 value="{{ panel_cfg.get('colorlight_ports',2) }}"
+                 min="1" max="8">
+          <div class="setting-desc">
+            Number of card output ports wired to panels.
+            Each port drives an equal horizontal strip.
+          </div>
+        </div>
       </div>
       <div style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
                   border-radius:6px; padding:10px 12px; font-size:12px;
-                  color:var(--muted); line-height:1.6; margin-bottom:16px;">
-        ℹ️ The 5A-75B must be pre-configured with <strong>ColorLight Studio</strong>
-        (Windows) for panel resolution and port mapping before first use.
-        Connect the card directly to the Pi's Ethernet port or a dedicated switch.
-        Give both devices a static IP on the same subnet (e.g. 192.168.0.x).
-        The GPIO HAT settings below are ignored when ColorLight output is active.
+                  color:var(--muted); line-height:1.6; margin-bottom:12px;">
+        ℹ️ Connect the 5A-75B directly to the Pi's Ethernet port (or a dedicated switch).
+        Assign both devices a static IP on the same subnet — e.g. Pi: 192.168.0.1,
+        card: 192.168.0.20.  The daemon sends the full configuration automatically
+        on startup.  Use <strong>Configure Card Now</strong> to re-send it without restarting.
       </div>
+      <button type="button" id="cl-configure-btn"
+              onclick="configureColorlight()"
+              style="margin-bottom:16px; padding:8px 18px;
+                     background:var(--accent,#4f8ef7); color:#fff;
+                     border:none; border-radius:6px; cursor:pointer; font-size:13px;">
+        ⚡ Configure Card Now
+      </button>
+      <div id="cl-configure-result" style="font-size:12px; margin-bottom:16px;"></div>
       <hr style="margin-bottom:16px;">
     </div>
 
@@ -672,6 +696,33 @@ const BOARD_PRESETS = {
   'adafruit-triple-rpi5': { gpio: 'adafruit-hat-pwm', slowdown: 2, parallelMax: 3,
     note: 'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.' },
 };
+
+function configureColorlight() {
+  const btn    = document.getElementById('cl-configure-btn');
+  const result = document.getElementById('cl-configure-result');
+  btn.disabled    = true;
+  btn.textContent = '⏳ Configuring…';
+  result.textContent = '';
+  fetch('/settings/configure-colorlight', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+  })
+  .then(r => r.json())
+  .then(data => {
+    result.style.color = data.ok ? 'var(--success,#4ade80)' : 'var(--error,#f87171)';
+    result.textContent = data.ok
+      ? '✓ Configuration sent to card successfully.'
+      : '✗ Error: ' + (data.error || 'unknown');
+  })
+  .catch(e => {
+    result.style.color = 'var(--error,#f87171)';
+    result.textContent = '✗ Request failed: ' + e;
+  })
+  .finally(() => {
+    btn.disabled    = false;
+    btn.textContent = '⚡ Configure Card Now';
+  });
+}
 
 function toggleOutputSections(outputType) {
   const gpioSection       = document.getElementById('gpio-section');
