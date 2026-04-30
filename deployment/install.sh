@@ -37,8 +37,8 @@ step "1. System update and dependencies"
 # =============================================================================
 apt-get update
 apt-get install -y \
-    git build-essential pkg-config \
-    python3 python3-pip python3-dev \
+    git build-essential pkg-config cmake \
+    python3 python3-pip python3-dev python3-cython \
     python3-flask python3-flask-login \
     python3-pil python3-numpy \
     ffmpeg \
@@ -96,9 +96,10 @@ fi
 # =============================================================================
 step "5. Install Python bindings"
 # =============================================================================
-# The hZeller bindings must be compiled via make (no setup.py/pyproject.toml)
-make -C "$MATRIX_DIR/bindings/python" build-python PYTHON="$(which python3)"
-make -C "$MATRIX_DIR/bindings/python" install-python PYTHON="$(which python3)"
+# pyproject.toml is in the repo ROOT (not bindings/python) and uses
+# scikit-build-core + cmake + cython. Install build tool then the package.
+pip3 install --break-system-packages scikit-build-core
+pip3 install --break-system-packages "$MATRIX_DIR"
 log "Python bindings installed"
 
 # =============================================================================
