@@ -8,7 +8,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/PixelCast
 Environment="SIGNAGE_SECRET=CHANGE_THIS_TO_A_RANDOM_SECRET_KEY"
-ExecStart=/usr/bin/python3 /opt/PixelCast/led-signage/daemon.py \
+ExecStart=/usr/bin/taskset -c 3 /usr/bin/python3 /opt/PixelCast/led-signage/daemon.py \
     --config=/opt/PixelCast/config/panel.json \
     --playlist=/opt/PixelCast/config/playlist.json \
     --schedule=/opt/PixelCast/config/schedule.json \
