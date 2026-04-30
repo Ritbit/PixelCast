@@ -33,6 +33,57 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="save_panel">
 
+    <!-- ---- Board / HAT selection ---- -->
+    <div style="font-size:12px; font-weight:600; color:var(--muted);
+                text-transform:uppercase; letter-spacing:.05em;
+                margin-bottom:10px;">Board / HAT Selection</div>
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="form-group">
+        <label>Board type</label>
+        <select name="board_type" id="board-type-select"
+                onchange="applyBoardPreset(this.value)">
+          {% set bt = panel_cfg.get('board_type','electrodragon-rpi4') %}
+          <option value="electrodragon-rpi4"
+            {{ 'selected' if bt=='electrodragon-rpi4' }}>
+            ElectroDragon MPC1073 — Raspberry Pi 3/4
+          </option>
+          <option value="electrodragon-rpi5"
+            {{ 'selected' if bt=='electrodragon-rpi5' }}>
+            ElectroDragon MPC1073 — Raspberry Pi 5 (experimental)
+          </option>
+          <option value="adafruit-triple-rpi4"
+            {{ 'selected' if bt=='adafruit-triple-rpi4' }}>
+            Adafruit Triple Bonnet #6358 — Raspberry Pi 3/4
+          </option>
+          <option value="adafruit-triple-rpi5"
+            {{ 'selected' if bt=='adafruit-triple-rpi5' }}>
+            Adafruit Triple Bonnet #6358 — Raspberry Pi 5 ✓ Recommended
+          </option>
+        </select>
+        <div class="setting-desc">
+          Selects GPIO mapping &amp; slowdown defaults for your hardware.
+          Individual fields below can still be fine-tuned.
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="visibility:hidden">Apply</label>
+        <div id="board-preset-note"
+             style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
+                    border-radius:6px; padding:10px 12px; font-size:12px;
+                    color:var(--muted); line-height:1.6;">
+          {{ {
+            'electrodragon-rpi4':   'Uses BCM GPIO direct access. Parallel max: 2. Not recommended on Pi 5.',
+            'electrodragon-rpi5':   'Pi 5 RP1 GPIO — marginal support. Prefer the Adafruit bonnet for Pi 5.',
+            'adafruit-triple-rpi4': 'PWM-based driving via adafruit-hat-pwm mapping. Parallel max: 3.',
+            'adafruit-triple-rpi5': 'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.'
+          }.get(panel_cfg.get('board_type','electrodragon-rpi4'),
+                'Select a board type above.') }}
+        </div>
+      </div>
+    </div>
+
+    <hr style="margin-bottom:16px;">
+
     <!-- Display geometry -->
     <div style="font-size:12px; font-weight:600; color:var(--muted);
                 text-transform:uppercase; letter-spacing:.05em;
@@ -546,6 +597,30 @@
 function setRefresh(hz) {
   document.getElementById('limit-refresh-input').value = hz;
   return false;
+}
+
+const BOARD_PRESETS = {
+  'electrodragon-rpi4':   { gpio: 'regular',          slowdown: 4, parallelMax: 2,
+    note: 'Uses BCM GPIO direct access. Parallel max: 2. Not recommended on Pi 5.' },
+  'electrodragon-rpi5':   { gpio: 'regular',          slowdown: 2, parallelMax: 2,
+    note: 'Pi 5 RP1 GPIO — marginal support. Prefer the Adafruit bonnet for Pi 5.' },
+  'adafruit-triple-rpi4': { gpio: 'adafruit-hat-pwm', slowdown: 4, parallelMax: 3,
+    note: 'PWM-based driving via adafruit-hat-pwm mapping. Parallel max: 3.' },
+  'adafruit-triple-rpi5': { gpio: 'adafruit-hat-pwm', slowdown: 2, parallelMax: 3,
+    note: 'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.' },
+};
+
+function applyBoardPreset(boardType) {
+  const preset = BOARD_PRESETS[boardType];
+  if (!preset) return;
+  document.querySelector('select[name="gpio_mapping"]').value = preset.gpio;
+  document.querySelector('input[name="slowdown_gpio"]').value  = preset.slowdown;
+  const parallelInput = document.querySelector('input[name="parallel"]');
+  if (parseInt(parallelInput.value) > preset.parallelMax) {
+    parallelInput.value = preset.parallelMax;
+  }
+  parallelInput.max = preset.parallelMax;
+  document.getElementById('board-preset-note').textContent = preset.note;
 }
 
 const csrfToken = '{{ csrf_token() }}';

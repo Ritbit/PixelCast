@@ -225,6 +225,7 @@ def settings():
             cfg_path = current_app.config.get('CONFIG_PATH', 'config/panel.json')
             try:
                 new_cfg = {
+                    'board_type':          request.form.get('board_type', 'electrodragon-rpi4'),
                     'gpio_mapping':        request.form.get('gpio_mapping', 'regular'),
                     'rows':                int(request.form.get('rows', 64)),
                     'cols':                int(request.form.get('cols', 128)),
@@ -259,13 +260,15 @@ def settings():
         return redirect(url_for('main.settings'))
 
     from signage.web.api import _get_api_key
+    from signage.matrix import BOARD_PRESETS
     users_path = current_app.config['USERS_PATH']
     users = load_users(users_path)
     return render_template('settings.html',
                            brightness=engine.cfg.get('brightness', 80),
                            panel_cfg=engine.cfg,
                            api_key=_get_api_key(),
-                           users=users)
+                           users=users,
+                           board_presets=BOARD_PRESETS)
 
 
 # ---------------------------------------------------------------------------

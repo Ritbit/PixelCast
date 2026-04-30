@@ -28,6 +28,39 @@ log = logging.getLogger('matrix')
 # Types that produce a static first frame — safe to pre-render in background
 STATIC_TYPES = {'image', 'gif', 'clock', 'text', 'countdown', 'weather'}
 
+# Hardware presets — applied before per-field overrides in panel.json.
+# Each preset defines the safe defaults for that board + Pi generation.
+BOARD_PRESETS = {
+    'electrodragon-rpi4': {
+        'label':       'ElectroDragon MPC1073 (Raspberry Pi 3/4)',
+        'gpio_mapping': 'regular',
+        'slowdown_gpio': 4,
+        'parallel_max': 2,
+        'note': 'Uses BCM GPIO direct access. Not recommended on Pi 5.',
+    },
+    'electrodragon-rpi5': {
+        'label':       'ElectroDragon MPC1073 (Raspberry Pi 5 — experimental)',
+        'gpio_mapping': 'regular',
+        'slowdown_gpio': 2,
+        'parallel_max': 2,
+        'note': 'Pi 5 RP1 GPIO — marginal support. Prefer Adafruit bonnet for Pi 5.',
+    },
+    'adafruit-triple-rpi4': {
+        'label':       'Adafruit Triple Bonnet #6358 (Raspberry Pi 3/4)',
+        'gpio_mapping': 'adafruit-hat-pwm',
+        'slowdown_gpio': 4,
+        'parallel_max': 3,
+        'note': 'PWM-based driving. Supports up to 3 parallel chains.',
+    },
+    'adafruit-triple-rpi5': {
+        'label':       'Adafruit Triple Bonnet #6358 (Raspberry Pi 5)',
+        'gpio_mapping': 'adafruit-hat-pwm',
+        'slowdown_gpio': 2,
+        'parallel_max': 3,
+        'note': 'Recommended board for Pi 5. Supports up to 3 parallel chains.',
+    },
+}
+
 try:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions
     REAL_MATRIX = True
@@ -60,6 +93,7 @@ class MatrixEngine:
 
     def _load_config(self, path):
         defaults = {
+            "board_type": "electrodragon-rpi4",
             "gpio_mapping": "regular", "rows": 64, "cols": 128,
             "chain": 2, "parallel": 2, "slowdown_gpio": 4,
             "pwm_bits": 7, "pwm_lsb_nanoseconds": 50,
@@ -68,13 +102,27 @@ class MatrixEngine:
         }
         if os.path.exists(path):
             with open(path) as f:
-                defaults.update(json.load(f))
+                file_cfg = json.load(f)
+            # Apply board preset defaults first, then let file values override
+            board_type = file_cfg.get('board_type', defaults['board_type'])
+            preset = BOARD_PRESETS.get(board_type, {})
+            if preset:
+                defaults['gpio_mapping']  = preset['gpio_mapping']
+                defaults['slowdown_gpio'] = preset['slowdown_gpio']
+                log.info(f"Board preset '{board_type}': {preset['label']}")
+            defaults.update(file_cfg)
             log.info(f"Panel config loaded from {path}")
         return defaults
 
     def _init_matrix(self):
         if not REAL_MATRIX:
             return _StubMatrix(self.width, self.height)
+        board_type = self.cfg.get('board_type', 'electrodragon-rpi4')
+        preset     = BOARD_PRESETS.get(board_type, {})
+        if preset:
+            log.info(f"Initialising matrix for: {preset['label']}")
+            if preset.get('note'):
+                log.info(f"Board note: {preset['note']}")
         options = RGBMatrixOptions()
         options.hardware_mapping         = self.cfg['gpio_mapping']
         options.rows                     = self.cfg['rows']
