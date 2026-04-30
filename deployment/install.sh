@@ -38,7 +38,7 @@ step "1. System update and dependencies"
 apt-get update
 apt-get install -y \
     git build-essential pkg-config cmake \
-    python3 python3-pip python3-dev python3-cython \
+    python3 python3-pip python3-dev cython3 \
     python3-flask python3-flask-login \
     python3-pil python3-numpy \
     ffmpeg \
