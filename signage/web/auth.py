@@ -124,7 +124,6 @@ def init_auth(app, users_path: str):
     lm = LoginManager()
     lm.init_app(app)
     lm.login_view    = 'main.login'
-    lm.login_message = 'Please log in.'
 
     @lm.user_loader
     def load_user(user_id):
