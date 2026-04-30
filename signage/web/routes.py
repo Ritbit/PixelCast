@@ -247,6 +247,9 @@ def settings():
                     'limit_refresh':       int(request.form.get('limit_refresh', 0)),
                     'disable_hardware_pulsing': request.form.get('disable_hardware_pulsing') == '1',
                     'show_refresh_rate':   request.form.get('show_refresh_rate') == '1',
+                    'output_type':         request.form.get('output_type', 'gpio'),
+                    'colorlight_ip':       request.form.get('colorlight_ip', '192.168.0.20'),
+                    'colorlight_port':     int(request.form.get('colorlight_port', 7000)),
                 }
                 os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
                 with open(cfg_path, 'w') as f:

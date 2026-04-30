@@ -22,32 +22,9 @@ import threading
 import numpy as np
 from datetime import datetime
 from PIL import Image
+from signage.outputs import create_output
 
 log = logging.getLogger('matrix')
-
-
-def _thread_ids():
-    """Return the set of all TIDs in the current process (Linux only)."""
-    try:
-        return {int(t) for t in os.listdir(f'/proc/{os.getpid()}/task')}
-    except OSError:
-        return set()
-
-
-def _pin_new_threads(tids_before, cpu=3):
-    """Pin threads created after tids_before snapshot to a specific CPU core.
-
-    Used to move the C++ rgbmatrix refresh thread(s) onto the isolated core
-    while leaving the Python/Flask threads on the general-purpose cores.
-    Requires root. Silently skips on non-Linux or if affinity call fails.
-    """
-    new_tids = _thread_ids() - tids_before
-    for tid in new_tids:
-        try:
-            os.sched_setaffinity(tid, {cpu})
-            log.info(f"Matrix refresh thread {tid} pinned to CPU core {cpu}")
-        except (OSError, AttributeError) as e:
-            log.debug(f"Could not pin thread {tid} to core {cpu}: {e}")
 
 
 # Types that produce a static first frame — safe to pre-render in background
@@ -86,13 +63,6 @@ BOARD_PRESETS = {
     },
 }
 
-try:
-    from rgbmatrix import RGBMatrix, RGBMatrixOptions
-    REAL_MATRIX = True
-except ImportError:
-    log.warning("rgbmatrix not found - running in STUB mode")
-    REAL_MATRIX = False
-
 
 class MatrixEngine:
     def __init__(self, config_path: str, playlist):
@@ -107,7 +77,7 @@ class MatrixEngine:
         self.cfg    = self._load_config(config_path)
         self.width  = self.cfg['display_width']
         self.height = self.cfg['display_height']
-        self.matrix = self._init_matrix()
+        self.output = create_output(self.cfg)
         self._current_frame = np.zeros(
             (self.height, self.width, 3), dtype=np.uint8)
         self._last_frame_time = time.time()   # for watchdog
@@ -138,64 +108,6 @@ class MatrixEngine:
             defaults.update(file_cfg)
             log.info(f"Panel config loaded from {path}")
         return defaults
-
-    def _init_matrix(self):
-        if not REAL_MATRIX:
-            return _StubMatrix(self.width, self.height)
-        board_type = self.cfg.get('board_type', 'electrodragon-rpi4')
-        preset     = BOARD_PRESETS.get(board_type, {})
-        if preset:
-            log.info(f"Initialising matrix for: {preset['label']}")
-            if preset.get('note'):
-                log.info(f"Board note: {preset['note']}")
-        options = RGBMatrixOptions()
-        options.hardware_mapping         = self.cfg['gpio_mapping']
-        options.rows                     = self.cfg['rows']
-        options.cols                     = self.cfg['cols']
-        options.chain_length             = self.cfg['chain']
-        options.parallel                 = self.cfg['parallel']
-        options.gpio_slowdown            = self.cfg['slowdown_gpio']
-        options.pwm_bits                 = self.cfg['pwm_bits']
-        options.pwm_lsb_nanoseconds      = self.cfg['pwm_lsb_nanoseconds']
-        options.pwm_dither_bits          = self.cfg['pwm_dither_bits']
-        options.brightness               = self.cfg['brightness']
-        options.disable_hardware_pulsing = self.cfg.get('disable_hardware_pulsing', False)
-        options.show_refresh_rate        = self.cfg.get('show_refresh_rate', False)
-        options.drop_privileges          = False
-
-        limit = self.cfg.get('limit_refresh', 0)
-        if limit > 0:
-            options.limit_refresh_rate_hz = limit
-            log.info(f"Panel refresh rate limited to {limit}Hz")
-
-        scan_mode = self.cfg.get('scan_mode', 0)
-        if scan_mode:
-            options.scan_mode = scan_mode
-
-        row_addr = self.cfg.get('row_addr_type', 0)
-        if row_addr:
-            options.row_address_type = row_addr
-
-        mux = self.cfg.get('multiplexing', 0)
-        if mux:
-            options.multiplexing = mux
-
-        rgb_seq = self.cfg.get('rgb_sequence', 'RGB')
-        if rgb_seq and rgb_seq != 'RGB':
-            options.led_rgb_sequence = rgb_seq
-
-        panel_type = self.cfg.get('panel_type', '')
-        if panel_type:
-            options.panel_type = panel_type
-
-        pixel_mapper = self.cfg.get('pixel_mapper', '')
-        if pixel_mapper:
-            options.pixel_mapper_config = pixel_mapper
-        tids_before = _thread_ids()
-        m = RGBMatrix(options=options)
-        _pin_new_threads(tids_before, cpu=3)
-        log.info("RGBMatrix hardware initialised")
-        return m
 
     # ------------------------------------------------------------------
     # Public control API
@@ -231,8 +143,7 @@ class MatrixEngine:
     def set_brightness(self, pct: int):
         pct = max(1, min(100, pct))
         self.cfg['brightness'] = pct
-        if REAL_MATRIX:
-            self.matrix.brightness = pct
+        self.output.set_brightness(pct)
 
     def get_status(self) -> dict:
         item = self.playlist.current_item()
@@ -265,9 +176,7 @@ class MatrixEngine:
             alert_frame = self._alert_mgr.get_frame(frame, self.width, self.height)
             if alert_frame is not None:
                 frame = alert_frame
-        if REAL_MATRIX:
-            self.matrix.SetImage(
-                Image.fromarray(frame.astype(np.uint8), 'RGB'))
+        self.output.send_frame(Image.fromarray(frame.astype(np.uint8), 'RGB'))
 
     def black(self):
         self.show_frame(np.zeros((self.height, self.width, 3), dtype=np.uint8))

@@ -33,7 +33,69 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="action" value="save_panel">
 
-    <!-- ---- Board / HAT selection ---- -->
+    <!-- ---- Output type ---- -->
+    <div style="font-size:12px; font-weight:600; color:var(--muted);
+                text-transform:uppercase; letter-spacing:.05em;
+                margin-bottom:10px;">Output Type</div>
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="form-group">
+        <label>Output backend</label>
+        <select name="output_type" id="output-type-select"
+                onchange="toggleOutputSections(this.value)">
+          {% set ot = panel_cfg.get('output_type','gpio') %}
+          <option value="gpio"        {{ 'selected' if ot=='gpio' }}>
+            GPIO HAT (rpi-rgb-led-matrix)
+          </option>
+          <option value="colorlight"  {{ 'selected' if ot=='colorlight' }}>
+            ColorLight 5A-75B (Ethernet receiver card)
+          </option>
+        </select>
+        <div class="setting-desc">
+          GPIO HAT: direct HUB75 via Raspberry Pi GPIO pins.<br>
+          ColorLight: send frames over Ethernet to a 5A-75B receiver card.
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- ColorLight settings (shown only when output_type=colorlight) ---- -->
+    <div id="colorlight-section"
+         style="display:{{ 'block' if panel_cfg.get('output_type')=='colorlight' else 'none' }};">
+      <div style="font-size:12px; font-weight:600; color:var(--muted);
+                  text-transform:uppercase; letter-spacing:.05em;
+                  margin-bottom:10px;">ColorLight 5A-75B Settings</div>
+      <div class="grid-3" style="margin-bottom:16px;">
+        <div class="form-group">
+          <label>Card IP address</label>
+          <input type="text" name="colorlight_ip"
+                 value="{{ panel_cfg.get('colorlight_ip','192.168.0.20') }}"
+                 placeholder="192.168.0.20">
+          <div class="setting-desc">
+            Static IP assigned to the 5A-75B. Set via ColorLight Studio.
+          </div>
+        </div>
+        <div class="form-group">
+          <label>UDP port</label>
+          <input type="number" name="colorlight_port"
+                 value="{{ panel_cfg.get('colorlight_port',7000) }}"
+                 min="1" max="65535">
+          <div class="setting-desc">Default: 7000</div>
+        </div>
+      </div>
+      <div style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
+                  border-radius:6px; padding:10px 12px; font-size:12px;
+                  color:var(--muted); line-height:1.6; margin-bottom:16px;">
+        ℹ️ The 5A-75B must be pre-configured with <strong>ColorLight Studio</strong>
+        (Windows) for panel resolution and port mapping before first use.
+        Connect the card directly to the Pi's Ethernet port or a dedicated switch.
+        Give both devices a static IP on the same subnet (e.g. 192.168.0.x).
+        The GPIO HAT settings below are ignored when ColorLight output is active.
+      </div>
+      <hr style="margin-bottom:16px;">
+    </div>
+
+    <!-- ---- Board / HAT selection (hidden when colorlight output is selected) ---- -->
+    <div id="gpio-section"
+         style="display:{{ 'none' if panel_cfg.get('output_type')=='colorlight' else 'block' }};">
     <div style="font-size:12px; font-weight:600; color:var(--muted);
                 text-transform:uppercase; letter-spacing:.05em;
                 margin-bottom:10px;">Board / HAT Selection</div>
@@ -83,6 +145,7 @@
     </div>
 
     <hr style="margin-bottom:16px;">
+    </div><!-- /#gpio-section -->
 
     <!-- Display geometry -->
     <div style="font-size:12px; font-weight:600; color:var(--muted);
@@ -609,6 +672,18 @@ const BOARD_PRESETS = {
   'adafruit-triple-rpi5': { gpio: 'adafruit-hat-pwm', slowdown: 2, parallelMax: 3,
     note: 'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.' },
 };
+
+function toggleOutputSections(outputType) {
+  const gpioSection       = document.getElementById('gpio-section');
+  const colorlightSection = document.getElementById('colorlight-section');
+  if (outputType === 'colorlight') {
+    gpioSection.style.display       = 'none';
+    colorlightSection.style.display = 'block';
+  } else {
+    gpioSection.style.display       = 'block';
+    colorlightSection.style.display = 'none';
+  }
+}
 
 function applyBoardPreset(boardType) {
   const preset = BOARD_PRESETS[boardType];
