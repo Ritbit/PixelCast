@@ -16,16 +16,16 @@ features one at a time, testing each before moving to the next.
 
 ## Hardware (do not change these assumptions)
 
-| Item | Value |
-|---|---|
-| Controller | Raspberry Pi 4B |
-| HAT | ElectroDragon MPC1073 HUB75 |
-| Panels | 4× P2.5 128×64 HUB75E, arranged 2×2 |
-| Total resolution | **256×128 pixels** |
-| GPIO mapping | `regular` (never `adafruit-hat`) |
-| OS | Raspberry Pi OS Lite 64-bit, Bookworm/Debian 13 |
-| Python | 3.13 |
-| Display driver | hzeller/rpi-rgb-led-matrix at `/opt/PixelCast/rpi-rgb-led-matrix/` |
+| Item             | Value                                                              |
+|------------------|--------------------------------------------------------------------|
+| Controller       | Raspberry Pi 4B                                                    |
+| HAT              | ElectroDragon MPC1073 HUB75                                        |
+| Panels           | 4× P2.5 128×64 HUB75E, arranged 2×2                                |
+| Total resolution | **256×128 pixels**                                                 |
+| GPIO mapping     | `regular` (never `adafruit-hat`)                                   |
+| OS               | Raspberry Pi OS Lite 64-bit, Bookworm/Debian 13                    |
+| Python           | 3.13                                                               |
+| Display driver   | hzeller/rpi-rgb-led-matrix at `/opt/PixelCast/rpi-rgb-led-matrix/` |
 
 **Working panel flags** (always use these unless explicitly changing them):
 ```
@@ -292,13 +292,13 @@ Endpoint: `https://api.open-meteo.com/v1/forecast`
 
 **Layout (256×128):**
 ```
-┌─────────────────────────────────┐
+┌──────────────────────────────────┐
 │ Zaandam          14°C    ☁ Cloudy│  ← current conditions, top row
-│                                 │
-│  Mon  Tue  Wed                  │  ← forecast strip (if days > 1)
-│  12°  15°  11°                  │
-│  ☀    ⛅    🌧                   │
-└─────────────────────────────────┘
+│                                  │
+│  Mon  Tue  Wed                   │  ← forecast strip (if days > 1)
+│  12°  15°  11°                   │
+│  ☀    ⛅    🌧                    │
+└──────────────────────────────────┘
 ```
 
 **Weather icons:** render as emoji using a font that supports them, OR

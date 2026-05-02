@@ -1,5 +1,5 @@
 [Unit]
-Description=LED Matrix Signage Daemon
+Description=PixelCast - LED Matrix Signage Daemon
 After=network.target
 Wants=network.target
 

@@ -31,11 +31,11 @@ The `install.sh` script performs the following:
 5. **Python Packages** - Installs Flask, Pillow, NumPy, PyAV
 6. **Directory Setup** - Creates media/, fonts/, config/ directories
 7. **Panel Config** - Generates default panel.json configuration
-8. **Systemd Service** - Installs and enables the led-signage service
+8. **Systemd Service** - Installs and enables the PixelCast service
 
 ### Requirements
 
-- Raspberry Pi 4 (or compatible)
+- Raspberry Pi 4 (or compatible, NOTE Pi 5 support is very experimental!)
 - Fresh Raspberry Pi OS installation
 - Root access
 - Internet connection
@@ -50,18 +50,18 @@ sudo bash deployment/install.sh
 After installation:
 ```bash
 # Start the service
-sudo systemctl start led-signage
+sudo systemctl start PixelCast
 
 # Check status
-sudo systemctl status led-signage
+sudo systemctl status PixelCast
 
 # View logs
-sudo journalctl -u led-signage -f
+sudo journalctl -u PixelCast -f
 ```
 
 ## Systemd Service
 
-The service file (`systemd/led-signage.service`) configures:
+The service file (`systemd/PixelCast.service`) configures:
 - Runs as root (required for GPIO access)
 - Auto-restart on failure
 - Starts after network is available
@@ -77,12 +77,12 @@ If installing manually, generate a secret key and update the service file:
 python3 -c "import secrets; print(secrets.token_hex(32))"
 
 # Edit the service file
-sudo nano /etc/systemd/system/led-signage.service
+sudo nano /etc/systemd/system/PixelCast.service
 
 # Replace CHANGE_THIS_TO_A_RANDOM_SECRET_KEY with your generated key
 # Then reload systemd
 sudo systemctl daemon-reload
-sudo systemctl restart led-signage
+sudo systemctl restart PixelCast
 ```
 
 ## Nginx Configuration
@@ -118,7 +118,7 @@ Edit `config/panel.json` after installation to customize.
 ### Service won't start
 ```bash
 # Check logs
-sudo journalctl -u led-signage -n 50
+sudo journalctl -u PixelCast -n 50
 
 # Test manually
 sudo python3 /opt/PixelCast/led-signage/daemon.py
@@ -146,25 +146,25 @@ To update an existing installation:
 
 ```bash
 # Stop the service
-sudo systemctl stop led-signage
+sudo systemctl stop PixelCast
 
 # Pull latest code
 cd /opt/PixelCast/led-signage
 git pull
 
 # Restart service
-sudo systemctl start led-signage
+sudo systemctl start PixelCast
 ```
 
 ## Uninstall
 
 ```bash
 # Stop and disable service
-sudo systemctl stop led-signage
-sudo systemctl disable led-signage
+sudo systemctl stop PixelCast
+sudo systemctl disable PixelCast
 
 # Remove service file
-sudo rm /etc/systemd/system/led-signage.service
+sudo rm /etc/systemd/system/PixelCast.service
 sudo systemctl daemon-reload
 
 # Remove installation (optional)

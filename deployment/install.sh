@@ -68,7 +68,7 @@ BLACKLIST="/etc/modprobe.d/blacklist-audio.conf"
 # =============================================================================
 step "3. Clone / update rpi-rgb-led-matrix"
 # =============================================================================
-if [ -d "$MATRIX_DIR" ]; then
+if [ -d "$MATRIX_DIR/.git" ]; then
     warn "Already exists, pulling latest..."
     git -C "$MATRIX_DIR" pull
 else
@@ -164,8 +164,8 @@ fi
 # =============================================================================
 step "8. Install systemd service"
 # =============================================================================
-SERVICE_SRC="$SIGNAGE_DIR/deployment/systemd/led-signage.service"
-SERVICE_DST="/etc/systemd/system/led-signage.service"
+SERVICE_SRC="$SIGNAGE_DIR/deployment/systemd/PixelCast.service"
+SERVICE_DST="/etc/systemd/system/PixelCast.service"
 
 if [ -f "$SERVICE_SRC" ]; then
     # Generate random secret key for Flask session security
@@ -176,7 +176,7 @@ if [ -f "$SERVICE_SRC" ]; then
     sed -i "s/CHANGE_THIS_TO_A_RANDOM_SECRET_KEY/$SECRET_KEY/" "$SERVICE_DST"
     
     systemctl daemon-reload
-    systemctl enable led-signage
+    systemctl enable PixelCast
     log "Systemd service installed and enabled with generated secret key"
 else
     warn "Service file not found at $SERVICE_SRC — skipping systemd setup"
@@ -195,12 +195,12 @@ echo "    --led-chain=2 --led-parallel=2 --led-slowdown-gpio=4 \\"
 echo "    --led-pwm-bits=7 --led-pwm-lsb-nanoseconds=50 \\"
 echo "    --led-pwm-dither-bits=1 -D0"
 echo ""
-echo " Start signage daemon:"
+echo " Start PixelCast signage daemon:"
 echo "  sudo python3 $SIGNAGE_DIR/daemon.py"
 echo ""
 echo " Or via systemd:"
-echo "  sudo systemctl start led-signage"
-echo "  sudo systemctl status led-signage"
+echo "  sudo systemctl start PixelCast"
+echo "  sudo systemctl status PixelCast"
 echo ""
 echo " Web UI: http://$(hostname -I | awk '{print $1}'):5000"
 echo ""

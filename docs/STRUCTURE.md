@@ -24,7 +24,7 @@ pixelcast/
 │   ├── README.md                   # Deployment guide
 │   ├── install.sh                  # Main installation script
 │   ├── systemd/
-│   │   └── led-signage.service     # Systemd service unit
+│   │   └── PixelCast.service       # Systemd service unit
 │   └── nginx/
 │       └── pixelcast.conf          # Nginx reverse proxy config
 │
@@ -135,13 +135,13 @@ In production (`/opt/PixelCast`), code and data are completely separated:
 ## Key Paths Reference
 
 ### Production Paths
-| Component | Path | Purpose |
-|-----------|------|---------|
-| Application | `/opt/PixelCast/led-signage/` | Replaceable code |
-| Config | `/opt/PixelCast/config/` | Persistent configuration |
-| Media | `/opt/PixelCast/media/` | Persistent media files |
-| Matrix Library | `/opt/PixelCast/rpi-rgb-led-matrix/` | HUB75 driver |
-| Static Assets | `/opt/PixelCast/led-signage/signage/web/static/` | Served by Nginx |
+| Component     | Path                                             | Purpose                    |
+|---------------|--------------------------------------------------|----------------------------|
+| Application   | `/opt/PixelCast/led-signage/`                    | Replaceable code           |
+| Config        | `/opt/PixelCast/config/`                         | Persistent configuration   |
+| Media         | `/opt/PixelCast/media/`                          | Persistent media files     |
+| Matrix Library| `/opt/PixelCast/rpi-rgb-led-matrix/`             | HUB75 driver               |
+| Static Assets | `/opt/PixelCast/led-signage/signage/web/static/` | Served by Nginx            |
 
 ### Deployment
 - **Install**: `sudo bash deployment/install.sh`
