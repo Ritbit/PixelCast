@@ -33,26 +33,37 @@ echo "✓ Upload complete"
 # Deploy
 echo "[3/5] Deploying on server..."
 ssh root@$SERVER << 'EOF'
-cd /opt/PixelCast
+mkdir -p /opt/PixelCast/led-signage
+cd /opt/PixelCast/led-signage
 tar -xzf /root/led-signage.tar.gz
-echo "✓ Files extracted"
+rm -f /root/led-signage.tar.gz
+# Clean up any stray top-level files from previous bad deploys
+rm -f /opt/PixelCast/daemon.py /opt/PixelCast/requirements.txt
+rm -rf /opt/PixelCast/signage /opt/PixelCast/deployment /opt/PixelCast/docs
+echo "✓ Files extracted to /opt/PixelCast/led-signage/"
 EOF
 
 # Update Nginx
 echo "[4/5] Updating Nginx configuration..."
 ssh root@$SERVER << 'EOF'
-sudo cp /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf /etc/nginx/sites-available/led-signage
-sudo nginx -t && sudo systemctl reload nginx
-echo "✓ Nginx reloaded"
+if [ -f /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf ]; then
+  cp /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf /etc/nginx/sites-available/PixelCast
+  ln -sf /etc/nginx/sites-available/PixelCast /etc/nginx/sites-enabled/PixelCast
+  rm -f /etc/nginx/sites-enabled/led-signage /etc/nginx/sites-enabled/default
+  nginx -t && systemctl reload nginx
+  echo "✓ Nginx reloaded (site: PixelCast)"
+else
+  echo "⚠ Nginx config not found — skipping"
+fi
 EOF
 
 # Restart
 echo "[5/5] Restarting service..."
-ssh root@$SERVER 'sudo systemctl restart led-signage'
+ssh root@$SERVER 'systemctl restart PixelCast'
 echo "✓ Service restarted"
 
 echo ""
 echo "=== Deployment Complete ==="
-echo "Check status: ssh root@$SERVER 'sudo systemctl status led-signage'"
-echo "View logs:    ssh root@$SERVER 'journalctl -u led-signage -f'"
+echo "Check status: ssh root@$SERVER 'systemctl status PixelCast'"
+echo "View logs:    ssh root@$SERVER 'journalctl -u PixelCast -f'"
 echo ""
