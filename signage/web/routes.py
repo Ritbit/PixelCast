@@ -797,15 +797,23 @@ def transcode_video(filename):
                         'message': f'Already transcoded ({size}KB)',
                         'already_done': True})
 
+    from signage.transcoder import transcode_queue_status
+    qs = transcode_queue_status(path)
+    if qs['active'] or qs['queued']:
+        pos_msg = 'currently encoding' if qs['active'] else f'queue position {qs["position"]}'
+        return jsonify({'ok': True,
+                        'message': f'Already in queue ({pos_msg})',
+                        'already_done': False})
+
     def on_complete(success, out_path):
         if success:
             log.info(f"Transcode done: {out_path}")
         else:
             log.error(f"Transcode failed for {path}")
 
-    transcode_async(path, w, h, on_complete=on_complete)
+    pos = transcode_async(path, w, h, on_complete=on_complete)
     return jsonify({'ok': True,
-                    'message': f'Transcoding to {w}×{h} in background...'})
+                    'message': f'Queued (position {pos}) — transcoding to {w}×{h}…'})
 
 
 @files_bp.route('/retranscode/<filename>', methods=['POST'])
@@ -848,16 +856,19 @@ def retranscode_video(filename):
 @files_bp.route('/transcode_status/<filename>')
 @login_required
 def transcode_status(filename):
-    """Check if a transcoded version exists."""
-    from signage.transcoder import matrix_path, is_transcoded
+    """Check transcoded state and queue position for a video."""
+    from signage.transcoder import matrix_path, is_transcoded, transcode_queue_status
     media_dir = current_app.config['MEDIA_DIR']
     filename  = secure_filename(filename)
     path      = os.path.join(media_dir, filename)
     mp        = matrix_path(path)
     done      = is_transcoded(path)
     size      = os.path.getsize(mp) // 1024 if done else 0
+    qs        = transcode_queue_status(path)
     return jsonify({'done': done, 'size_kb': size,
-                    'matrix_file': os.path.basename(mp) if done else None})
+                    'matrix_file': os.path.basename(mp) if done else None,
+                    'active': qs['active'], 'queued': qs['queued'],
+                    'queue_position': qs['position']})
 
 
 # ---------------------------------------------------------------------------

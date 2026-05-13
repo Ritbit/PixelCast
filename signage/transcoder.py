@@ -15,6 +15,7 @@
 """
 
 import os
+import queue
 import subprocess
 import logging
 import threading
@@ -196,17 +197,72 @@ def transcode(path: str, display_width: int, display_height: int,
             on_complete(False, '')
 
 
+# ---------------------------------------------------------------------------
+# Serialised transcode queue — one job at a time, no parallel ffmpeg
+# ---------------------------------------------------------------------------
+_queue:        queue.Queue       = queue.Queue()
+_queued_paths: set               = set()          # paths waiting in queue
+_active_path:  str | None        = None           # path currently encoding
+_queue_lock:   threading.Lock    = threading.Lock()
+_worker:       threading.Thread | None = None
+
+
+def _worker_loop():
+    global _active_path
+    while True:
+        job = _queue.get()
+        path, w, h, on_progress, on_complete = job
+        with _queue_lock:
+            _queued_paths.discard(path)
+            _active_path = path
+        try:
+            transcode(path, w, h, on_progress, on_complete)
+        except Exception as e:
+            log.error(f"Worker transcode error: {e}")
+        finally:
+            with _queue_lock:
+                _active_path = None
+        _queue.task_done()
+
+
+def _ensure_worker():
+    global _worker
+    with _queue_lock:
+        if _worker is None or not _worker.is_alive():
+            _worker = threading.Thread(
+                target=_worker_loop,
+                name='TranscodeWorker',
+                daemon=True
+            )
+            _worker.start()
+
+
 def transcode_async(path: str, display_width: int, display_height: int,
                     on_complete=None):
-    """Start transcoding in a background thread. Returns the thread."""
-    t = threading.Thread(
-        target=transcode,
-        args=(path, display_width, display_height, None, on_complete),
-        name=f'Transcode-{os.path.basename(path)}',
-        daemon=True
-    )
-    t.start()
-    return t
+    """Queue a transcode job.  At most one ffmpeg runs at a time.
+    Returns queue position (1 = next up, 0 = currently active).
+    """
+    _ensure_worker()
+    with _queue_lock:
+        if path == _active_path or path in _queued_paths:
+            log.info(f"Transcode already queued/active: {os.path.basename(path)}")
+            return 0
+        _queued_paths.add(path)
+        pos = len(_queued_paths)   # approximate position
+    _queue.put((path, display_width, display_height, None, on_complete))
+    log.info(f"Queued transcode #{pos}: {os.path.basename(path)}")
+    return pos
+
+
+def transcode_queue_status(path: str) -> dict:
+    """Return queue info for a given path.
+    Keys: active (bool), queued (bool), position (int, 0 if not queued).
+    """
+    with _queue_lock:
+        active = path == _active_path
+        queued = path in _queued_paths
+        pos    = (list(_queued_paths).index(path) + 1) if queued else 0
+    return {'active': active, 'queued': queued, 'position': pos}
 
 
 def resolve_video_path(path: str, item: dict = None) -> str:
