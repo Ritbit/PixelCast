@@ -808,6 +808,43 @@ def transcode_video(filename):
                     'message': f'Transcoding to {w}×{h} in background...'})
 
 
+@files_bp.route('/retranscode/<filename>', methods=['POST'])
+@login_required
+@require_role('editor')
+def retranscode_video(filename):
+    """Delete existing optimised version and re-transcode from scratch."""
+    from signage.transcoder import transcode_async, matrix_path
+    media_dir = current_app.config['MEDIA_DIR']
+    engine    = current_app.config['ENGINE']
+    filename  = secure_filename(filename)
+    path      = os.path.join(media_dir, filename)
+
+    if not os.path.exists(path):
+        return jsonify({'ok': False, 'message': 'File not found'}), 404
+
+    mp = matrix_path(path)
+    for f in (mp, mp + '.tmp.mp4'):
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+                log.info(f"Removed for re-transcode: {os.path.basename(f)}")
+            except OSError as e:
+                return jsonify({'ok': False, 'message': f'Could not remove old file: {e}'}), 500
+
+    w = engine.cfg.get('display_width',  256)
+    h = engine.cfg.get('display_height', 128)
+
+    def on_complete(success, out_path):
+        if success:
+            log.info(f"Re-transcode done: {out_path}")
+        else:
+            log.error(f"Re-transcode failed for {path}")
+
+    transcode_async(path, w, h, on_complete=on_complete)
+    return jsonify({'ok': True,
+                    'message': f'Re-optimising to {w}×{h} in background...'})
+
+
 @files_bp.route('/transcode_status/<filename>')
 @login_required
 def transcode_status(filename):

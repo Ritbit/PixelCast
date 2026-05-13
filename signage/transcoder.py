@@ -94,11 +94,15 @@ def transcode(path: str, display_width: int, display_height: int,
         pass
 
     # Build ffmpeg command
+    # - yadif=0: deinterlace (no-op on progressive content, fixes interlaced DVD/TV sources)
+    # - fps=fps=25: proper cadence resampling to 25fps (avoids uneven frame duplication
+    #   that occurs when -r is used alone on 23.976/29.97fps sources)
     # - scale to fit display, pad with black to exact display size
     # - libx264 at crf=23 (good quality, small file)
-    # - 25fps output (consistent frame rate for matrix timing)
     # - strip audio (not needed for LED display)
     vf = (
+        f"yadif=0,"
+        f"fps=fps=25,"
         f"scale={display_width}:{display_height}"
         f":force_original_aspect_ratio=decrease,"
         f"pad={display_width}:{display_height}"
@@ -109,7 +113,6 @@ def transcode(path: str, display_width: int, display_height: int,
         '-threads', '2',     # cap cores; signage daemon keeps the rest
         '-i', path,
         '-vf', vf,
-        '-r', '25',          # normalise to 25fps
         '-c:v', 'libx264',
         '-crf', '23',
         '-preset', 'fast',

@@ -142,6 +142,10 @@
         <button class="btn btn-sm btn-secondary"
                 title="Optimise for display (transcode to {{ display_width }}×{{ display_height }})"
                 onclick="transcodeFile('{{ f.name }}', this)">⚙ Optimise</button>
+        {% elif f.type == 'video' and f.get('transcoded') %}
+        <button class="btn btn-sm btn-secondary"
+                title="Re-optimise — discards existing version and re-encodes from source"
+                onclick="retranscodeFile('{{ f.name }}', this)">↺ Re-optimise</button>
         {% endif %}
         <form method="post"
               action="{{ url_for('files.delete', filename=f.name) }}"
@@ -260,6 +264,42 @@ function transcodeFile(filename, btn) {
       } else {
         btn.textContent = '❌';
         btn.title       = data.message;
+        btn.disabled    = false;
+      }
+    })
+    .catch(() => {
+      btn.textContent = '❌';
+      btn.disabled    = false;
+    });
+}
+
+function retranscodeFile(filename, btn) {
+  if (!confirm(`Re-optimise "${filename}"?\nThe existing optimised version will be deleted and re-encoded from the original source.`)) return;
+  btn.disabled    = true;
+  btn.textContent = '⏳';
+  btn.title       = 'Re-optimising…';
+
+  fetch(`/files/retranscode/${encodeURIComponent(filename)}`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken}
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        btn.title = data.message;
+        const poll = setInterval(() => {
+          fetch(`/files/transcode_status/${encodeURIComponent(filename)}`)
+            .then(r => r.json())
+            .then(s => {
+              if (s.done) {
+                clearInterval(poll);
+                window.location.reload();
+              }
+            });
+        }, 3000);
+      } else {
+        btn.textContent = '❌';
+        btn.title       = data.message || 'Failed';
         btn.disabled    = false;
       }
     })
