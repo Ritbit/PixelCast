@@ -82,8 +82,9 @@ def transcode(path: str, display_width: int, display_height: int,
     out = matrix_path(path)
     tmp = out + '.tmp.mp4'
 
-    # Get source duration for progress calculation
+    # Get source duration and fps for progress calculation and output rate selection
     duration_s = 0.0
+    source_fps = 0.0
     try:
         r = subprocess.run(
             ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
@@ -93,17 +94,53 @@ def transcode(path: str, display_width: int, display_height: int,
         duration_s = float(r.stdout.strip() or 0)
     except Exception:
         pass
+    try:
+        r = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+             '-show_entries', 'stream=r_frame_rate',
+             '-of', 'default=noprint_wrappers=1:nokey=1', path],
+            capture_output=True, text=True, timeout=10
+        )
+        num, _, den = r.stdout.strip().partition('/')
+        if num and den:
+            source_fps = float(num) / float(den)
+    except Exception:
+        pass
 
-    # Build ffmpeg command
-    # - yadif=0: deinterlace (no-op on progressive content, fixes interlaced DVD/TV sources)
-    # - fps=fps=25: proper cadence resampling to 25fps (avoids uneven frame duplication
-    #   that occurs when -r is used alone on 23.976/29.97fps sources)
+    # Probe field order — only deinterlace if source is actually interlaced
+    interlaced = False
+    try:
+        r = subprocess.run(
+            ['ffprobe', '-v', 'error', '-select_streams', 'v:0',
+             '-show_entries', 'stream=field_order',
+             '-of', 'default=noprint_wrappers=1:nokey=1', path],
+            capture_output=True, text=True, timeout=10
+        )
+        field_order = r.stdout.strip().lower()
+        interlaced  = field_order not in ('progressive', 'unknown', '')
+        log.info(f"Source field_order: '{field_order}' → interlaced={interlaced}")
+    except Exception:
+        pass
+
+    # Choose output fps to avoid cadence judder from non-integer fps ratios:
+    #   ~60fps source → 30fps (exact 2:1 drop, no blending needed)
+    #   ~50fps source → 25fps (exact 2:1 drop)
+    #   anything else → 25fps
+    if source_fps >= 48:
+        output_fps = 30
+    else:
+        output_fps = 25
+    log.info(f"Source fps: {source_fps:.3f} → output fps: {output_fps}")
+
+    # Build ffmpeg filter chain:
+    # - yadif=0: only added for interlaced sources (skipped for progressive —
+    #   running yadif on progressive content wastes significant CPU for nothing)
+    # - fps filter: uniform cadence conversion to output_fps
     # - scale to fit display, pad with black to exact display size
-    # - libx264 at crf=23 (good quality, small file)
-    # - strip audio (not needed for LED display)
+    deinterlace = "yadif=0," if interlaced else ""
     vf = (
-        f"yadif=0,"
-        f"fps=fps=25,"
+        f"{deinterlace}"
+        f"fps=fps={output_fps},"
         f"scale={display_width}:{display_height}"
         f":force_original_aspect_ratio=decrease,"
         f"pad={display_width}:{display_height}"
@@ -132,7 +169,7 @@ def transcode(path: str, display_width: int, display_height: int,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            preexec_fn=lambda: os.nice(15)
+            preexec_fn=lambda: os.nice(5)
         )
 
         # Parse ffmpeg progress output

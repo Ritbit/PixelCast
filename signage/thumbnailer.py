@@ -113,7 +113,7 @@ def _video_thumb(src: str, dest: str) -> bool:
                     '-i', src, '-vframes', '1', '-q:v', '3', tmp
                 ],
                 capture_output=True, timeout=30,
-                preexec_fn=lambda: os.nice(10)
+                preexec_fn=lambda: os.nice(5)
             )
             if result.returncode == 0 and os.path.exists(tmp):
                 img = Image.open(tmp).convert('RGB')
