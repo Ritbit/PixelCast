@@ -73,6 +73,12 @@ def main():
         log.error("Must run as root: sudo python3 daemon.py")
         sys.exit(1)
 
+    try:
+        os.nice(-10)
+        log.info("Daemon process priority raised (nice -10)")
+    except OSError as e:
+        log.warning(f"Could not raise process priority: {e}")
+
     signal.signal(signal.SIGINT,  signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 

@@ -106,6 +106,7 @@ def transcode(path: str, display_width: int, display_height: int,
     )
     cmd = [
         'ffmpeg', '-y',
+        '-threads', '2',     # cap cores; signage daemon keeps the rest
         '-i', path,
         '-vf', vf,
         '-r', '25',          # normalise to 25fps
@@ -126,7 +127,8 @@ def transcode(path: str, display_width: int, display_height: int,
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            preexec_fn=lambda: os.nice(15)
         )
 
         # Parse ffmpeg progress output
