@@ -67,7 +67,7 @@ def needs_transcode(path: str, display_width: int, display_height: int) -> bool:
 
 
 def transcode(path: str, display_width: int, display_height: int,
-              on_progress=None, on_complete=None):
+              on_progress=None, on_complete=None, crf: int = 18):
     """
     Transcode a video to display resolution using ffmpeg.
     Runs synchronously — call from a thread if you don't want to block.
@@ -78,6 +78,7 @@ def transcode(path: str, display_width: int, display_height: int,
         display_height: target height
         on_progress:    optional callback(percent: int)
         on_complete:    optional callback(success: bool, out_path: str)
+        crf:            libx264 CRF quality (18=high, 23=medium, 28=small file)
     """
     out = matrix_path(path)
     tmp = out + '.tmp.mp4'
@@ -152,7 +153,7 @@ def transcode(path: str, display_width: int, display_height: int,
         '-i', path,
         '-vf', vf,
         '-c:v', 'libx264',
-        '-crf', '23',
+        '-crf', str(crf),
         '-preset', 'fast',
         '-an',               # no audio
         '-movflags', '+faststart',
@@ -248,12 +249,12 @@ def _worker_loop():
     global _active_path
     while True:
         job = _queue.get()
-        path, w, h, on_progress, on_complete = job
+        path, w, h, on_progress, on_complete, crf = job
         with _queue_lock:
             _queued_paths.discard(path)
             _active_path = path
         try:
-            transcode(path, w, h, on_progress, on_complete)
+            transcode(path, w, h, on_progress, on_complete, crf)
         except Exception as e:
             log.error(f"Worker transcode error: {e}")
         finally:
@@ -275,7 +276,7 @@ def _ensure_worker():
 
 
 def transcode_async(path: str, display_width: int, display_height: int,
-                    on_complete=None):
+                    on_complete=None, crf: int = 18):
     """Queue a transcode job.  At most one ffmpeg runs at a time.
     Returns queue position (1 = next up, 0 = currently active).
     """
@@ -286,8 +287,8 @@ def transcode_async(path: str, display_width: int, display_height: int,
             return 0
         _queued_paths.add(path)
         pos = len(_queued_paths)   # approximate position
-    _queue.put((path, display_width, display_height, None, on_complete))
-    log.info(f"Queued transcode #{pos}: {os.path.basename(path)}")
+    _queue.put((path, display_width, display_height, None, on_complete, crf))
+    log.info(f"Queued transcode #{pos} crf={crf}: {os.path.basename(path)}")
     return pos
 
 

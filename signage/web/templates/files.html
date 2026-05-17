@@ -143,9 +143,19 @@
                 title="Optimise for display (transcode to {{ display_width }}×{{ display_height }})"
                 onclick="transcodeFile('{{ f.name }}', this)">⚙ Optimise</button>
         {% elif f.type == 'video' and f.get('transcoded') %}
+        {% set crf_id = 'crf-' ~ loop.index %}
+        <select class="btn btn-sm btn-secondary" id="{{ crf_id }}"
+                title="Quality — lower CRF = better quality, larger file"
+                style="padding:3px 6px; cursor:pointer;">
+          <option value="18">High quality</option>
+          <option value="23">Medium</option>
+          <option value="28">Small file</option>
+        </select>
         <button class="btn btn-sm btn-secondary"
                 title="Re-optimise — discards existing version and re-encodes from source"
-                onclick="retranscodeFile('{{ f.name }}', this)">↺ Re-optimise</button>
+                data-filename="{{ f.name }}"
+                data-crf-select="{{ crf_id }}"
+                onclick="retranscodeFile(this)">↺ Re-optimise</button>
         {% endif %}
         <form method="post"
               action="{{ url_for('files.delete', filename=f.name) }}"
@@ -273,15 +283,19 @@ function transcodeFile(filename, btn) {
     });
 }
 
-function retranscodeFile(filename, btn) {
-  if (!confirm(`Re-optimise "${filename}"?\nThe existing optimised version will be deleted and re-encoded from the original source.`)) return;
+function retranscodeFile(btn) {
+  const filename   = btn.dataset.filename;
+  const crf        = parseInt(document.getElementById(btn.dataset.crfSelect).value) || 18;
+  const qualityLabel = crf <= 18 ? 'High quality' : crf <= 23 ? 'Medium' : 'Small file';
+  if (!confirm(`Re-optimise "${filename}" at ${qualityLabel} (CRF ${crf})?\nThe existing optimised version will be deleted and re-encoded from the original source.`)) return;
   btn.disabled    = true;
   btn.textContent = '⏳';
   btn.title       = 'Re-optimising…';
 
   fetch(`/files/retranscode/${encodeURIComponent(filename)}`, {
     method: 'POST',
-    headers: {'X-CSRFToken': csrfToken}
+    headers: {'X-CSRFToken': csrfToken, 'Content-Type': 'application/json'},
+    body: JSON.stringify({crf: crf})
   })
     .then(r => r.json())
     .then(data => {

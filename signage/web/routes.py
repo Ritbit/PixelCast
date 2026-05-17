@@ -842,15 +842,19 @@ def retranscode_video(filename):
     w = engine.cfg.get('display_width',  256)
     h = engine.cfg.get('display_height', 128)
 
+    data = request.get_json(silent=True) or {}
+    crf  = int(data.get('crf', 18))
+    crf  = max(18, min(35, crf))   # clamp to sane range
+
     def on_complete(success, out_path):
         if success:
             log.info(f"Re-transcode done: {out_path}")
         else:
             log.error(f"Re-transcode failed for {path}")
 
-    transcode_async(path, w, h, on_complete=on_complete)
+    transcode_async(path, w, h, on_complete=on_complete, crf=crf)
     return jsonify({'ok': True,
-                    'message': f'Re-optimising to {w}×{h} in background...'})
+                    'message': f'Re-optimising to {w}×{h} at CRF {crf} in background...'})
 
 
 @files_bp.route('/transcode_status/<filename>')
