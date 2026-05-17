@@ -95,17 +95,8 @@ step "4. Build rpi-rgb-led-matrix"
 # =============================================================================
 make -C "$MATRIX_DIR/lib"
 make -C "$MATRIX_DIR/examples-api-use"
-make -C "$MATRIX_DIR/utils" all
-
-# video-viewer fallback
-if [ ! -f "$MATRIX_DIR/utils/video-viewer" ]; then
-    warn "Building video-viewer manually..."
-    cd "$MATRIX_DIR/utils"
-    g++ -o video-viewer video-viewer.cc \
-        -I../include ../lib/librgbmatrix.a \
-        $(pkg-config --cflags --libs libavcodec libavformat libswscale libavdevice libavutil) \
-        -lpthread -lm -O3 -std=c++17 && log "video-viewer built" || warn "video-viewer failed"
-fi
+# utils/ skipped — led-image-viewer needs GraphicsMagick (not installed) and
+# video-viewer is unused; PixelCast uses PyAV for all video rendering.
 
 # =============================================================================
 step "5. Install Python bindings"
