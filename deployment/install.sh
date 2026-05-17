@@ -118,9 +118,11 @@ log "Python signage packages installed"
 # =============================================================================
 step "7. Deploy signage system"
 # =============================================================================
-if [ ! -d "$SIGNAGE_DIR" ]; then
-    warn "Signage dir not found at $SIGNAGE_DIR"
-    warn "Copy the led-signage directory to $SIGNAGE_DIR manually"
+if [ ! -f "$SIGNAGE_DIR/daemon.py" ]; then
+    warn "Signage source not found at $SIGNAGE_DIR"
+    warn "Copy the source tree with:"
+    warn "  cp -r /path/to/pixelcast/. $SIGNAGE_DIR/"
+    warn "Note: use trailing /. to copy contents, not the folder itself"
 else
     log "Signage system found at $SIGNAGE_DIR"
 fi
