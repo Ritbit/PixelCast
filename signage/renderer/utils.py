@@ -262,7 +262,7 @@ def fit_image(img: Image.Image, width: int, height: int,
               fast: bool = False) -> Image.Image:
     """Resize image. fast=True uses BILINEAR (for video frames)."""
     resample     = Image.BILINEAR if fast else Image.LANCZOS
-    scale_factor = max(0.05, min(1.0, scale_factor))
+    scale_factor = max(0.05, scale_factor)   # no upper cap — allow zoom-in > 100 %
 
     if scale_mode == 'stretch':
         return img.resize((width, height), resample)
@@ -275,10 +275,17 @@ def fit_image(img: Image.Image, width: int, height: int,
         t     = (nh - height) // 2
         return img.crop((l, t, l + width, t + height))
     else:
-        target_w = int(width  * scale_factor)
-        target_h = int(height * scale_factor)
-        img = img.copy()
-        img.thumbnail((target_w, target_h), resample)
+        # Compute the fit ratio (letterbox), then apply scale_factor.
+        # thumbnail() only shrinks — use resize() so values > 1.0 enlarge.
+        ratio = min(width / img.width, height / img.height) * scale_factor
+        nw    = max(1, int(img.width  * ratio))
+        nh    = max(1, int(img.height * ratio))
+        img   = img.resize((nw, nh), resample)
+        # Zoom-in: image larger than canvas → centre-crop to canvas size.
+        if nw > width or nh > height:
+            l = max(0, (nw - width)  // 2)
+            t = max(0, (nh - height) // 2)
+            img = img.crop((l, t, l + width, t + height))
         return img
 
 
