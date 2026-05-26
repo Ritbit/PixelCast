@@ -21,6 +21,15 @@
       <h1>is starting up</h1>
     </div>
   <p>The display daemon is not running or is still initialising.</p>
-  <p><a href="javascript:location.reload()">Refresh</a> in a moment.</p>
+  <p>Retrying in <span id="cd">5</span>s &nbsp;·&nbsp; <a href="javascript:location.reload()">Reload now</a></p>
 </body>
+<script>
+  let t = 5;
+  const el = document.getElementById('cd');
+  setInterval(() => {
+    t--;
+    el.textContent = t;
+    if (t <= 0) location.reload();
+  }, 1000);
+</script>
 </html>
