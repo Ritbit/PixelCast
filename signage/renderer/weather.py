@@ -237,6 +237,33 @@ def _draw_lightning(draw, x, y, h, m):
 # Data fetching
 # ---------------------------------------------------------------------------
 
+_CACHE_DIR = '/opt/PixelCast/cache'
+
+
+def _cache_path(lat, lon, units):
+    return os.path.join(_CACHE_DIR, f'weather_{lat}_{lon}_{units}.json')
+
+
+def _load_cache(lat, lon, units):
+    try:
+        p = _cache_path(lat, lon, units)
+        if os.path.exists(p):
+            with open(p) as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return None
+
+
+def _save_cache(lat, lon, units, data):
+    try:
+        os.makedirs(_CACHE_DIR, exist_ok=True)
+        with open(_cache_path(lat, lon, units), 'w') as f:
+            json.dump(data, f)
+    except Exception:
+        pass
+
+
 def _fetch(lat, lon, days, units):
     import urllib.request
     temp_unit = 'celsius' if units == 'celsius' else 'fahrenheit'
@@ -274,11 +301,13 @@ class WeatherRenderer(BaseRenderer):
         self._icon_dir = item.get('icon_dir',
                          '/root/led-signage/media/weather-icons')
 
-        self._data       = None
+        self._data       = _load_cache(self._lat, self._lon, self._units)
+        self._stale      = self._data is not None
         self._frame      = None
         self._bg_cache   = load_background(width, height, item)
         self._lock       = threading.Lock()
         self._last_fetch = 0
+        self._err_count  = 0
         self._lightweight = lightweight
         # 15 minute refresh interval (override item config)
         self._interval   = 900
@@ -302,11 +331,19 @@ class WeatherRenderer(BaseRenderer):
         try:
             data = _fetch(self._lat, self._lon, self._days, self._units)
             with self._lock:
-                self._data = data
+                self._data  = data
+                self._stale = False
+                self._err_count = 0
                 self._last_fetch = time.time()
                 self._frame = None   # invalidate cached frame
+            _save_cache(self._lat, self._lon, self._units, data)
         except Exception as e:
-            log.error(f"Weather fetch failed: {e}")
+            with self._lock:
+                self._err_count += 1
+                cnt = self._err_count
+            # Only log the first failure and then every 10th to avoid spam
+            if cnt == 1 or cnt % 10 == 0:
+                log.warning(f"Weather fetch failed (attempt {cnt}): {e}")
 
     def _get_icon(self, code: int, size: int) -> Image.Image:
         _, icon_key = WMO.get(code, ('Unknown', 'cloudy'))
@@ -341,10 +378,24 @@ class WeatherRenderer(BaseRenderer):
             data = self._data
 
         if data is None:
-            # No data yet — return blank background silently
+            # No data at all (no cache, no live fetch) — show error message
+            draw = ImageDraw.Draw(canvas)
+            lines = ['No weather data', 'API unavailable']
+            y = max(4, (self.height - len(lines) * (self._font_sm.size + 2)) // 2)
+            for line in lines:
+                tw = self._text_w(line, self._font_sm)
+                draw.text(((self.width - tw) // 2, y), line,
+                          font=self._font_sm, fill=(200, 80, 80))
+                y += self._font_sm.size + 2
             return np.array(canvas, dtype=np.uint8)
 
+        with self._lock:
+            stale = self._stale
+
         draw    = ImageDraw.Draw(canvas)
+        if stale:
+            # Faint indicator that this is cached/offline data
+            draw.text((2, 2), '⚠', font=self._font_sm, fill=(180, 120, 40))
         cur     = data.get('current', {})
         daily   = data.get('daily', {})
         temp    = cur.get('temperature_2m', '?')
