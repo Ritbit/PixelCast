@@ -429,7 +429,8 @@ class WeatherRenderer(BaseRenderer):
         _, icon_key = WMO.get(code, ('Unknown', 'cloudy'))
 
         # Try WMO-numbered PNG in icon_dir (e.g. 0.png, 61.png)
-        for fname in [f"{code}.png", f"{icon_key}.png"]:
+        # Named files use _named_ prefix (e.g. _named_sunny.png)
+        for fname in [f"{code}.png", f"_named_{icon_key}.png", f"{icon_key}.png"]:
             path = os.path.join(self._icon_dir, fname)
             if os.path.exists(path):
                 try:
@@ -540,8 +541,12 @@ class WeatherRenderer(BaseRenderer):
             times = daily.get('time', [])
 
             n_days     = min(self._days, len(codes))
-            col_w      = self.width // n_days
-            fi_size    = min(col_w - 4, top_h - 4)
+            col_w      = self.width // max(1, n_days)
+            # Compute icon size from actual bottom-half height
+            row_h      = self.height - top_h
+            label_h    = self._font_sm.size + 1
+            temp_h     = self._font_sm.size + 1
+            icon_h     = max(8, row_h - label_h - temp_h - 4)
 
             for i in range(n_days):
                 x     = i * col_w + col_w // 2
@@ -561,9 +566,9 @@ class WeatherRenderer(BaseRenderer):
                 dw = self._text_w(dname, self._font_sm)
                 draw.text((x - dw//2, y), dname,
                           font=self._font_sm, fill=(160, 160, 200))
-                y += self._font_sm.size + 1
+                y += label_h
 
-                icon = self._get_icon(d_code, fi_size - self._font_sm.size - 12)
+                icon = self._get_icon(d_code, icon_h)
                 canvas.paste(icon, (x - icon.width//2, y), icon)
                 y += icon.height + 2
 
