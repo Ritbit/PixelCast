@@ -371,7 +371,7 @@ class WeatherRenderer(BaseRenderer):
         self._days     = max(1, min(5, int(item.get('forecast_days', 3))))
         # interval set in __init__
         self._icon_dir = item.get('icon_dir',
-                         '/root/led-signage/media/weather-icons')
+                         '/opt/PixelCast/led-signage/media/weather-icons')
 
         self._data       = _load_cache(self._lat, self._lon, self._units)
         self._stale      = self._data is not None
