@@ -332,6 +332,12 @@ def _fetch_wttr(lat, lon, days, units):
     max_key    = 'maxtempC'  if use_c else 'maxtempF'
     min_key    = 'mintempC'  if use_c else 'mintempF'
 
+    def _day_wmo(day):
+        # weatherCode is NOT at the day level — use the midday hourly slot (index 4)
+        hourly = day.get('hourly', [])
+        slot   = hourly[4] if len(hourly) > 4 else (hourly[0] if hourly else {})
+        return _WTTR_TO_WMO.get(int(slot.get('weatherCode', 0)), 3)
+
     return {
         'current': {
             'temperature_2m':        float(cur_raw['temp_C' if use_c else 'temp_F']),
@@ -340,7 +346,7 @@ def _fetch_wttr(lat, lon, days, units):
             'wind_speed_10m':        float(cur_raw['windspeedKmph']),
         },
         'daily': {
-            'weather_code':        [_WTTR_TO_WMO.get(int(d['weatherCode']), 3) for d in forecasts],
+            'weather_code':        [_day_wmo(d) for d in forecasts],
             'temperature_2m_max':  [float(d[max_key]) for d in forecasts],
             'temperature_2m_min':  [float(d[min_key]) for d in forecasts],
             'time':                [d['date']          for d in forecasts],
@@ -394,8 +400,9 @@ class WeatherRenderer(BaseRenderer):
             threading.Thread(target=self._refresh, daemon=True).start()
 
     def _refresh(self):
-        last_err = None
+        errors = {}
         for fetcher in (_fetch_openmeteo, _fetch_wttr):
+            name = fetcher.__name__
             try:
                 data = fetcher(self._lat, self._lon, self._days, self._units)
                 with self._lock:
@@ -405,15 +412,18 @@ class WeatherRenderer(BaseRenderer):
                     self._last_fetch = time.time()
                     self._frame = None   # invalidate cached frame
                 _save_cache(self._lat, self._lon, self._units, data)
+                log.info(f"Weather data fetched via {name}")
                 return
             except Exception as e:
-                last_err = e
+                errors[name] = e
+                log.debug(f"Weather source {name} failed: {e}")
         # Both sources failed
         with self._lock:
             self._err_count += 1
             cnt = self._err_count
         if cnt == 1 or cnt % 10 == 0:
-            log.warning(f"All weather sources failed (attempt {cnt}): {last_err}")
+            details = '; '.join(f"{s}: {e}" for s, e in errors.items())
+            log.warning(f"All weather sources failed (attempt {cnt}): {details}")
 
     def _get_icon(self, code: int, size: int) -> Image.Image:
         _, icon_key = WMO.get(code, ('Unknown', 'cloudy'))
