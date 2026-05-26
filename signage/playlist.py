@@ -125,6 +125,26 @@ class PlaylistManager:
         self._load()
 
     # ------------------------------------------------------------------
+    # Path helpers
+    # ------------------------------------------------------------------
+
+    def _resolve_file(self, item: dict) -> None:
+        """Resolve item's 'file' field to an absolute path in-place."""
+        fp = item.get('file', '')
+        if fp and not os.path.isabs(fp):
+            item['file'] = os.path.join(self._media_dir, os.path.basename(fp))
+
+    def _strip_file(self, item: dict) -> dict:
+        """Return a copy of item with 'file' reduced to just the basename."""
+        item = item.copy()
+        fp = item.get('file', '')
+        if fp:
+            mdir = self._media_dir.rstrip(os.sep) + os.sep
+            if fp.startswith(mdir):
+                item['file'] = os.path.basename(fp)
+        return item
+
+    # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 
@@ -135,10 +155,11 @@ class PlaylistManager:
                     with open(self._path) as f:
                         data = json.load(f)
                     self._items = data if isinstance(data, list) else []
-                    # Ensure every item has an id
+                    # Ensure every item has an id and absolute file paths
                     for item in self._items:
                         if 'id' not in item:
                             item['id'] = str(uuid.uuid4())
+                        self._resolve_file(item)
                     log.info(f"Playlist loaded: {len(self._items)} items from {self._path}")
                 except Exception as e:
                     log.error(f"Failed to load playlist: {e}")
@@ -149,11 +170,12 @@ class PlaylistManager:
                 self._save()
 
     def _save(self):
-        """Write playlist to disk. Must be called with lock held."""
+        """Write playlist to disk with bare filenames. Must be called with lock held."""
         try:
             os.makedirs(os.path.dirname(self._path), exist_ok=True)
+            to_save = [self._strip_file(i) for i in self._items]
             with open(self._path, 'w') as f:
-                json.dump(self._items, f, indent=2)
+                json.dump(to_save, f, indent=2)
         except Exception as e:
             log.error(f"Failed to save playlist: {e}")
 
@@ -211,6 +233,7 @@ class PlaylistManager:
         item = copy.deepcopy(item)
         item['id'] = str(uuid.uuid4())
         item = self._apply_defaults(item)
+        self._resolve_file(item)   # ensure in-memory path is absolute
         with self._lock:
             self._items.append(item)
             self._save()
@@ -224,6 +247,7 @@ class PlaylistManager:
                 if item['id'] == item_id:
                     item.update(updates)
                     item['id'] = item_id  # preserve id
+                    self._resolve_file(item)   # ensure in-memory path is absolute
                     self._items[i] = item
                     self._save()
                     log.info(f"Updated item: {item_id}")
