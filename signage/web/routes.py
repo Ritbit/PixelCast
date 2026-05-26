@@ -553,14 +553,28 @@ def edit(item_id):
                 else:
                     del updates[fkey]
 
+        # scale_factor arrives as integer percent from UI (10–400) → store as float
+        if 'scale_factor' in updates:
+            try:
+                updates['scale_factor'] = max(0.1, min(4.0, int(updates['scale_factor']) / 100))
+            except (ValueError, TypeError):
+                updates['scale_factor'] = 1.0
+
         for field in ('wipe_in_speed', 'wipe_out_speed', 'fps_override',
-                      'scale_factor', 'kb_zoom_start', 'kb_zoom_end',
+                      'kb_zoom_start', 'kb_zoom_end',
                       'bg_dim', 'bg_scale_factor', 'bg_offset_x', 'bg_offset_y'):
             if field in updates:
                 try:
                     updates[field] = float(updates[field])
                 except ValueError:
                     updates[field] = 1.0
+
+        for field in ('prefix_size', 'suffix_size', 'finished_size'):
+            if field in updates:
+                try:
+                    updates[field] = int(updates[field])
+                except (ValueError, TypeError):
+                    del updates[field]
 
         # Keep start_offset as raw string (timecode format preserved)
         # The renderer will parse it via timecode.parse_timecode()

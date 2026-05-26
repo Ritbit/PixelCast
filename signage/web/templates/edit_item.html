@@ -320,10 +320,10 @@
       </div>
       <div class="form-group" id="scale-factor-row"
            style="{{ '' if item.get('scale_mode')=='custom' else 'display:none' }}">
-        <label>Scale Factor (0.1 – 1.0)</label>
-        <input type="number" name="scale_factor" step="0.05" min="0.1" max="1.0"
-               value="{{ item.get('scale_factor',1.0) }}">
-        <div class="hint">1.0 = fills available space, 0.5 = half size</div>
+        <label>Scale (%)</label>
+        <input type="number" name="scale_factor" step="5" min="10" max="400"
+               value="{{ (item.get('scale_factor',1.0)*100)|int }}">
+        <div class="hint">100 = fill space, 50 = half, 200 = double</div>
       </div>
       <div class="form-group">
         <label>Position</label>
@@ -419,9 +419,9 @@
       </div>
       <div class="form-group" id="scale-factor-row"
            style="{{ '' if item.get('scale_mode')=='custom' else 'display:none' }}">
-        <label>Scale Factor (0.1–1.0)</label>
-        <input type="number" name="scale_factor" step="0.05" min="0.1" max="1.0"
-               value="{{ item.get('scale_factor',1.0) }}">
+        <label>Scale (%)</label>
+        <input type="number" name="scale_factor" step="5" min="10" max="400"
+               value="{{ (item.get('scale_factor',1.0)*100)|int }}">
       </div>
       <div class="form-group">
         <label>Position</label>
@@ -783,6 +783,19 @@
                value="{{ item.get('prefix_color',[200,200,255]) | rgb_hex }}">
       </div>
       <div class="form-group">
+        <label>Prefix font</label>
+        <select name="prefix_font">
+          {% for fn in ['FreeSans.ttf','FreeSansBold.ttf','FreeMono.ttf','FreeSerif.ttf','DejaVuSans.ttf','DejaVuSans-Bold.ttf'] %}
+          <option value="{{ fn }}" {% if item.get('prefix_font','FreeSans.ttf')==fn %}selected{% endif %}>{{ fn.replace('.ttf','') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Prefix size (0 = auto)</label>
+        <input type="number" name="prefix_size" min="0" max="60"
+               value="{{ item.get('prefix_size', 0) }}">
+      </div>
+      <div class="form-group">
         <label>Suffix text (below countdown)</label>
         <input type="text" name="suffix_text"
                value="{{ item.get('suffix_text','') }}" placeholder="e.g. 'to go!'">
@@ -793,6 +806,19 @@
                value="{{ item.get('suffix_color',[200,200,200]) | rgb_hex }}">
       </div>
       <div class="form-group">
+        <label>Suffix font</label>
+        <select name="suffix_font">
+          {% for fn in ['FreeSans.ttf','FreeSansBold.ttf','FreeMono.ttf','FreeSerif.ttf','DejaVuSans.ttf','DejaVuSans-Bold.ttf'] %}
+          <option value="{{ fn }}" {% if item.get('suffix_font','FreeSans.ttf')==fn %}selected{% endif %}>{{ fn.replace('.ttf','') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Suffix size (0 = auto)</label>
+        <input type="number" name="suffix_size" min="0" max="60"
+               value="{{ item.get('suffix_size', 0) }}">
+      </div>
+      <div class="form-group">
         <label>Finished text (when zero reached)</label>
         <input type="text" name="finished_text"
                value="{{ item.get('finished_text','🎉 Done!') }}">
@@ -801,6 +827,19 @@
         <label>Finished color</label>
         <input type="color" name="finished_color"
                value="{{ item.get('finished_color',[255,180,0]) | rgb_hex }}">
+      </div>
+      <div class="form-group">
+        <label>Finished font</label>
+        <select name="finished_font">
+          {% for fn in ['FreeSansBold.ttf','FreeSans.ttf','FreeMono.ttf','FreeSerif.ttf','DejaVuSans.ttf','DejaVuSans-Bold.ttf'] %}
+          <option value="{{ fn }}" {% if item.get('finished_font','FreeSansBold.ttf')==fn %}selected{% endif %}>{{ fn.replace('.ttf','') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Finished size (0 = auto)</label>
+        <input type="number" name="finished_size" min="0" max="80"
+               value="{{ item.get('finished_size', 0) }}">
       </div>
     </div>
   </div>
@@ -1091,8 +1130,7 @@ function addLine() {
 }
 
 function removeLine(btn) {
-  const blocks = document.querySelectorAll('.line-block');
-  if (blocks.length > 1) btn.closest('.line-block').remove();
+  btn.closest('.line-block').remove();
 }
 </script>
 {% endblock %}

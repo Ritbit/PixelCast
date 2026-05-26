@@ -100,7 +100,9 @@ class CountdownRenderer(BaseRenderer):
         # Fonts — auto-size if not specified
         font_name   = item.get('font', 'FreeSansBold.ttf')
         lbl_font    = item.get('label_font', 'FreeSans.ttf')
-        pre_font    = item.get('prefix_font', 'FreeSans.ttf')
+        pre_font    = item.get('prefix_font',  'FreeSans.ttf')
+        suf_font    = item.get('suffix_font',  'FreeSans.ttf')
+        fin_font    = item.get('finished_font', font_name)
         n_units     = len(self._parts)
 
         if item.get('font_size', 0):
@@ -111,14 +113,15 @@ class CountdownRenderer(BaseRenderer):
                                  (width // max(1, n_units * 2 + 1))))
 
         lbl_sz      = max(6,  num_sz // 3)
-        pre_sz      = int(item.get('prefix_size',  max(8, height // 10)))
-        suf_sz      = int(item.get('suffix_size',  max(8, height // 12)))
+        pre_sz      = int(item.get('prefix_size',   max(8, height // 10)))
+        suf_sz      = int(item.get('suffix_size',   max(8, height // 12)))
+        fin_sz      = int(item.get('finished_size', max(12, height // 5)))
 
         self._num_font = _find_font(font_name, num_sz)
         self._lbl_font = _find_font(lbl_font,  lbl_sz)
         self._pre_font = _find_font(pre_font,  pre_sz)
-        self._suf_font = _find_font(pre_font,  suf_sz)
-        self._fin_font = _find_font(font_name, max(12, height // 5))
+        self._suf_font = _find_font(suf_font,  suf_sz)
+        self._fin_font = _find_font(fin_font,  fin_sz)
 
     def _text_w(self, t, f):
         try:
