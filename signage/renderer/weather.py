@@ -427,6 +427,7 @@ class WeatherRenderer(BaseRenderer):
 
     def _get_icon(self, code: int, size: int) -> Image.Image:
         _, icon_key = WMO.get(code, ('Unknown', 'cloudy'))
+        size = max(4, size)
 
         # Try WMO-numbered PNG in icon_dir (e.g. 0.png, 61.png)
         # Named files use _named_ prefix (e.g. _named_sunny.png)
@@ -435,14 +436,18 @@ class WeatherRenderer(BaseRenderer):
             if os.path.exists(path):
                 try:
                     icon = Image.open(path).convert('RGBA')
-                    # Resize with high quality if source is larger
                     if icon.width != size or icon.height != size:
                         icon = icon.resize((size, size), Image.LANCZOS)
+                    log.debug(f"Icon loaded: {path} @ {size}px")
                     return icon
-                except Exception:
-                    pass
+                except Exception as e:
+                    log.warning(f"Icon load failed {path}: {e}")
+            else:
+                log.debug(f"Icon not found: {path}")
 
         # Fall back to built-in drawn icon
+        log.warning(f"Using drawn fallback for code={code} key={icon_key} "
+                    f"icon_dir={self._icon_dir}")
         return _draw_icon(icon_key, size)
 
     def _text_w(self, text, font):
