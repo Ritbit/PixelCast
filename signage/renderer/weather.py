@@ -264,7 +264,24 @@ def _save_cache(lat, lon, units, data):
         pass
 
 
-def _fetch(lat, lon, days, units):
+# wttr.in weather codes → WMO codes
+_WTTR_TO_WMO = {
+    113: 0,  116: 2,  119: 3,  122: 3,
+    143: 45, 248: 45, 260: 48,
+    176: 80, 179: 85, 182: 80, 185: 51,
+    200: 95,
+    227: 71, 230: 75,
+    263: 51, 266: 51, 281: 51, 284: 51,
+    293: 61, 296: 61, 299: 63, 302: 63, 305: 65, 308: 65,
+    311: 61, 314: 63, 317: 80, 320: 80,
+    323: 71, 326: 71, 329: 73, 332: 73, 335: 75, 338: 75,
+    350: 51, 353: 80, 356: 82, 359: 82,
+    362: 85, 365: 86, 368: 85, 371: 86, 374: 85, 377: 86,
+    386: 95, 389: 95, 392: 95, 395: 99,
+}
+
+
+def _fetch_openmeteo(lat, lon, days, units):
     import urllib.request
     temp_unit = 'celsius' if units == 'celsius' else 'fahrenheit'
     url = (
@@ -280,6 +297,37 @@ def _fetch(lat, lon, days, units):
     )
     with urllib.request.urlopen(url, timeout=10) as r:
         return json.loads(r.read())
+
+
+def _fetch_wttr(lat, lon, days, units):
+    """Fallback: wttr.in — normalised to Open-Meteo response format."""
+    import urllib.request
+    url = f"https://wttr.in/{lat},{lon}?format=j1"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        raw = json.loads(r.read())
+
+    use_c   = (units == 'celsius')
+    cur_raw = raw['current_condition'][0]
+    wmo_cur = _WTTR_TO_WMO.get(int(cur_raw['weatherCode']), 3)
+
+    forecasts  = raw.get('weather', [])[:days]
+    max_key    = 'maxtempC'  if use_c else 'maxtempF'
+    min_key    = 'mintempC'  if use_c else 'mintempF'
+
+    return {
+        'current': {
+            'temperature_2m':        float(cur_raw['temp_C' if use_c else 'temp_F']),
+            'relative_humidity_2m':  float(cur_raw['humidity']),
+            'weather_code':          wmo_cur,
+            'wind_speed_10m':        float(cur_raw['windspeedKmph']),
+        },
+        'daily': {
+            'weather_code':        [_WTTR_TO_WMO.get(int(d['weatherCode']), 3) for d in forecasts],
+            'temperature_2m_max':  [float(d[max_key]) for d in forecasts],
+            'temperature_2m_min':  [float(d[min_key]) for d in forecasts],
+            'time':                [d['date']          for d in forecasts],
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -328,22 +376,26 @@ class WeatherRenderer(BaseRenderer):
             threading.Thread(target=self._refresh, daemon=True).start()
 
     def _refresh(self):
-        try:
-            data = _fetch(self._lat, self._lon, self._days, self._units)
-            with self._lock:
-                self._data  = data
-                self._stale = False
-                self._err_count = 0
-                self._last_fetch = time.time()
-                self._frame = None   # invalidate cached frame
-            _save_cache(self._lat, self._lon, self._units, data)
-        except Exception as e:
-            with self._lock:
-                self._err_count += 1
-                cnt = self._err_count
-            # Only log the first failure and then every 10th to avoid spam
-            if cnt == 1 or cnt % 10 == 0:
-                log.warning(f"Weather fetch failed (attempt {cnt}): {e}")
+        last_err = None
+        for fetcher in (_fetch_openmeteo, _fetch_wttr):
+            try:
+                data = fetcher(self._lat, self._lon, self._days, self._units)
+                with self._lock:
+                    self._data  = data
+                    self._stale = False
+                    self._err_count = 0
+                    self._last_fetch = time.time()
+                    self._frame = None   # invalidate cached frame
+                _save_cache(self._lat, self._lon, self._units, data)
+                return
+            except Exception as e:
+                last_err = e
+        # Both sources failed
+        with self._lock:
+            self._err_count += 1
+            cnt = self._err_count
+        if cnt == 1 or cnt % 10 == 0:
+            log.warning(f"All weather sources failed (attempt {cnt}): {last_err}")
 
     def _get_icon(self, code: int, size: int) -> Image.Image:
         _, icon_key = WMO.get(code, ('Unknown', 'cloudy'))
