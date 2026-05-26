@@ -29,6 +29,8 @@
       background: var(--bg); color: var(--text);
       font-family: 'Segoe UI', system-ui, sans-serif;
       font-size: 14px; line-height: 1.5;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
     }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
@@ -67,7 +69,7 @@
     .nav-user { color: var(--muted); font-size: 12px; }
 
     /* Layout */
-    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; flex: 1; width: 100%; }
     .page-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; }
 
     /* Cards */
@@ -225,7 +227,7 @@
   {% block content %}{% endblock %}
 </div>
 
-<footer style="margin-top:40px; border-top:1px solid var(--border); padding:14px 24px;
+<footer style="border-top:1px solid var(--border); padding:14px 24px;
                display:flex; align-items:center; justify-content:space-between;
                flex-wrap:wrap; gap:8px; font-size:11px; color:var(--muted);">
   <span>
