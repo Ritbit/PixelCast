@@ -590,7 +590,11 @@ def edit(item_id):
         for field in ('prefix_size', 'suffix_size', 'finished_size'):
             if field in updates:
                 try:
-                    updates[field] = int(updates[field])
+                    v = int(updates[field])
+                    if v > 0:
+                        updates[field] = v
+                    else:
+                        del updates[field]   # 0 → let renderer auto-size
                 except (ValueError, TypeError):
                     del updates[field]
 
@@ -1457,7 +1461,7 @@ def logs_data():
     lines = min(max(lines, 10), 1000)
     try:
         result = subprocess.run(
-            ['journalctl', '-u', 'led-signage', '-n', str(lines),
+            ['journalctl', '-u', 'PixelCast', '-n', str(lines),
              '--no-pager', '--output=short-iso'],
             capture_output=True, text=True, timeout=5
         )

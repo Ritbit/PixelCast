@@ -131,9 +131,9 @@ class CountdownRenderer(BaseRenderer):
                                  (width // max(1, n_units * 2 + 1))))
 
         lbl_sz      = max(6,  num_sz // 3)
-        pre_sz      = int(item.get('prefix_size',   max(8, height // 10)))
-        suf_sz      = int(item.get('suffix_size',   max(8, height // 12)))
-        fin_sz      = int(item.get('finished_size', max(12, height // 5)))
+        pre_sz      = max(1, int(item.get('prefix_size',   0) or (height // 10)))
+        suf_sz      = max(1, int(item.get('suffix_size',   0) or (height // 12)))
+        fin_sz      = max(1, int(item.get('finished_size', 0) or (height // 5)))
 
         self._num_font = _find_font(font_name, num_sz)
         self._lbl_font = _find_font(lbl_font,  lbl_sz)
