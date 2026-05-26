@@ -394,11 +394,11 @@ def add():
             })
         data['lines'] = lines
 
-    # Attach file path for media items (use relative path for data separation)
+    # Attach file path for media items — use absolute MEDIA_DIR path
     if data.get('type') in ('image', 'gif', 'video'):
         fname = data.pop('media_file', '')
         if fname:
-            data['file'] = os.path.join('media', fname)
+            data['file'] = os.path.join(current_app.config['MEDIA_DIR'], fname)
 
     item = playlist.add_item(data)
     current_app.config['ENGINE'].reload_playlist()
@@ -610,10 +610,14 @@ def edit(item_id):
         if 'scale_mode' in updates:
             updates['scale'] = updates['scale_mode']
 
-        # Resolve video file to transcoded version if available
+        # Resolve file path — if bare filename or relative path, anchor to MEDIA_DIR
         if 'file' in updates and updates['file']:
+            f = updates['file']
+            if not os.path.isabs(f):
+                f = os.path.join(current_app.config['MEDIA_DIR'],
+                                 os.path.basename(f))
             from signage.transcoder import resolve_video_path
-            updates['file'] = resolve_video_path(updates['file'])
+            updates['file'] = resolve_video_path(f)
 
         # Convert all hex color strings to [R,G,B] lists
         for _cf in ('bg_color', 'color', 'date_color', 'number_color',
