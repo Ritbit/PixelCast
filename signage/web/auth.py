@@ -38,6 +38,10 @@ class User(UserMixin):
         return ROLE_LEVEL.get(self.role, 0) >= ROLE_LEVEL.get(required, 0)
 
 
+_DEFAULT_USER = 'admin'
+_DEFAULT_PASS = 'admin'
+
+
 def load_users(path: str) -> dict:
     if os.path.exists(path):
         try:
@@ -49,9 +53,17 @@ def load_users(path: str) -> dict:
         except Exception as e:
             log.error(f'Failed to load users: {e}')
     else:
-        # No users file exists - return empty dict for first-run setup
+        # Seed default credentials so the system is immediately accessible
         os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-        log.warning(f'No users file found at {path} - first-run setup required')
+        default = {_DEFAULT_USER: {'password_hash': hash_password(_DEFAULT_PASS), 'role': 'admin'}}
+        try:
+            with open(path, 'w') as f:
+                json.dump(default, f, indent=2)
+            log.warning('No users file found — created default admin/admin account. '
+                        'Change the password via Settings after logging in!')
+        except Exception as e:
+            log.error(f'Failed to write default users: {e}')
+        return default
     return {}
 
 

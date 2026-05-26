@@ -79,10 +79,12 @@ def index():
 
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    users_path = current_app.config['USERS_PATH']
+
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        users    = load_users(current_app.config['USERS_PATH'])
+        users    = load_users(users_path)
 
         if username in users and \
            verify_password(password, users[username]['password_hash']):
