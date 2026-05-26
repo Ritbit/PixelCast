@@ -4,7 +4,7 @@
 
 set -e
 
-SERVER="${1:-192.168.2.173}"
+SERVER="${1:-172.17.124.195}"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== PixelCast Deployment ==="
@@ -16,6 +16,7 @@ echo ""
 echo "[1/4] Packaging application..."
 cd "$PROJECT_DIR"
 tar -czf led-signage.tar.gz \
+  --no-xattrs \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
   --exclude='.git' \

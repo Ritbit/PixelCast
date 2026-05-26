@@ -45,7 +45,7 @@ apt-get install -y \
     libavcodec-dev libavformat-dev libswscale-dev \
     libavdevice-dev libavutil-dev \
     fonts-dejavu-core fonts-freefont-ttf \
-    wget curl
+    wget curl nginx
 log "Dependencies installed"
 
 # =============================================================================

@@ -322,7 +322,12 @@ journalctl -u led-signage -n 100
 
 ## License
 
-This project is provided as-is for personal and commercial use.
+This project is licensed under the **GNU Affero General Public License v3.0 or later** (AGPL-3.0-or-later).
+
+If you modify this software and make it available over a network or distribute it,
+you must also make the complete corresponding source code available under the same license.
+
+See the [LICENSE](LICENSE) file for details.
 
 ---
 

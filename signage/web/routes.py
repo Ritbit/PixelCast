@@ -1,9 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# PixelCast
+# Copyright (C) 2026 Bas van Ritbergen
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public
+# License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/web/routes.py                                           ║
-║ Version:     1.0.0                                                           ║
+║ Version:     1.1.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: All Flask route blueprints - dashboard, playlist, files,        ║
 ║              control, schedule, settings, alerts, logs, and system routes.   ║
@@ -1413,7 +1431,7 @@ def health():
         'paused':              engine._pause_event.is_set(),
         'last_frame_age_s':    round(age, 2),
         'playlist_length':     len(playlist),
-        'version':             '1.0.0'
+        'version':             '1.1.0'
     })
 
 

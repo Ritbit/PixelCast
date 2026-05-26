@@ -1,9 +1,27 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# PixelCast
+# Copyright (C) 2026 Bas van Ritbergen
+#
+# This program is free software: you can redistribute it and/or modify it
+# under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+# or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public
+# License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/web/app.py                                              ║
-║ Version:     1.0.0                                                           ║
+║ Version:     1.1.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Flask application factory - creates and configures Flask app    ║
 ║              with all blueprints, authentication, and filters.               ║
@@ -44,6 +62,12 @@ def create_app(engine, playlist, scheduler, media_dir, users_path, alert_manager
     # Derive from the panel config path passed to the engine
     import inspect as _inspect
     app.config['CONFIG_PATH']  = engine.cfg.get('_path', '/media/usb/config/panel.json')
+
+    from signage import VERSION as _VERSION
+
+    @app.context_processor
+    def inject_version():
+        return {"pixelcast_version": _VERSION}
 
     init_auth(app, users_path)
     register_filters(app)

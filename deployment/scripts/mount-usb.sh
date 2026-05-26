@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# PixelCast — Copyright (C) 2026 Bas van Ritbergen
+#
 # mount-usb.sh — Find and mount the first USB storage device to /media/usb.
 # Called by PixelCast.service as ExecStartPre (failure is non-fatal).
 #

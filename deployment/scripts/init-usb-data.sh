@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# PixelCast — Copyright (C) 2026 Bas van Ritbergen
+#
 # init-usb-data.sh — Seed USB storage with default config and bundled media
 # on first boot (or whenever files are missing).
 # Called by PixelCast.service as ExecStartPre (failure is non-fatal).

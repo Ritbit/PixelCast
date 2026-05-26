@@ -39,6 +39,7 @@
       border-bottom: 1px solid var(--border);
       padding: 0 24px;
       display: flex; align-items: center; gap: 0;
+      position: sticky; top: 0; z-index: 100;
     }
     .nav-brand {
       display: flex; align-items: center; gap: 10px;
@@ -223,6 +224,23 @@
 
   {% block content %}{% endblock %}
 </div>
+
+<footer style="margin-top:40px; border-top:1px solid var(--border); padding:14px 24px;
+               display:flex; align-items:center; justify-content:space-between;
+               flex-wrap:wrap; gap:8px; font-size:11px; color:var(--muted);">
+  <span>
+    <strong style="color:var(--accent);">PixelCast</strong>
+    v{{ pixelcast_version }} &mdash;
+    &copy; 2026 Bas van Ritbergen / RitBit Technology
+  </span>
+  <span>
+    Licensed under the
+    <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank"
+       rel="noopener" style="color:var(--muted); text-decoration:underline;">
+      GNU AGPL&nbsp;v3.0
+    </a>
+  </span>
+</footer>
 
 {% block scripts %}{% endblock %}
 </body>
