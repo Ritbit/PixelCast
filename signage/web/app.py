@@ -41,9 +41,9 @@ def create_app(engine, playlist, scheduler, media_dir, users_path, alert_manager
     app.config['PLAYLIST']     = playlist
     app.config['SCHEDULER']    = scheduler
     # Store config path so settings route can save panel.json
-    import inspect, os as _os
-    # We infer it from engine.cfg — but simpler to just hardcode relative path
-    app.config['CONFIG_PATH']  = 'config/panel.json'
+    # Derive from the panel config path passed to the engine
+    import inspect as _inspect
+    app.config['CONFIG_PATH']  = engine.cfg.get('_path', '/media/usb/config/panel.json')
 
     init_auth(app, users_path)
     register_filters(app)

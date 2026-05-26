@@ -107,6 +107,7 @@ class MatrixEngine:
                 log.info(f"Board preset '{board_type}': {preset['label']}")
             defaults.update(file_cfg)
             log.info(f"Panel config loaded from {path}")
+        defaults['_path'] = os.path.abspath(path)
         return defaults
 
     # ------------------------------------------------------------------

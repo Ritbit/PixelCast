@@ -29,6 +29,23 @@ log = logging.getLogger('playlist')
 # ---------------------------------------------------------------------------
 DEFAULT_PLAYLIST = [
     {
+        "id":           "default-splash",
+        "type":         "image",
+        "name":         "PixelCast",
+        "duration":     10,
+        "wipe_in":      "zoom_in",
+        "wipe_out":     "fade_black",
+        "wipe_in_speed":  5.0,
+        "wipe_out_speed": 4.0,
+        # Bundled image lives on the read-only SD card — always available
+        "file":         "/opt/PixelCast/led-signage/media/pixelcast_final-dark-background.png",
+        "scale_mode":   "fit",
+        "scale_factor": 0.9,
+        "position":     "center",
+        "bg_mode":      "color",
+        "bg_color":     [0, 0, 0],
+    },
+    {
         "id":       "default-clock",
         "type":     "clock",
         "name":     "Clock",
@@ -37,23 +54,26 @@ DEFAULT_PLAYLIST = [
         "wipe_out": "fade",
         "format":   "%H:%M:%S",
         "date_format": "%A %d %B %Y",
-        "color":    [255, 255, 0],
-        "bg_color": [0, 0, 0]
+        "color":    [255, 220, 0],
+        "bg_color": [0, 0, 0],
     },
     {
-        "id":       "default-text",
-        "type":     "text",
-        "name":     "Welcome message",
-        "duration": 10,
-        "wipe_in":  "slide_left",
-        "wipe_out": "slide_left",
-        "lines": [
-            {"text": "LED Matrix", "color": [255, 100, 0], "font_size": 24, "align": "center"},
-            {"text": "Signage System", "color": [200, 200, 255], "font_size": 18, "align": "center"}
-        ],
-        "bg_color": [0, 0, 30],
-        "scroll":   False
-    }
+        "id":            "default-weather",
+        "type":          "weather",
+        "name":          "Weather",
+        "duration":      15,
+        "wipe_in":       "fade",
+        "wipe_out":      "fade",
+        "latitude":      52.37,
+        "longitude":     4.89,
+        "location_name": "Amsterdam",
+        "units":         "celsius",
+        "forecast_days": 3,
+        "show_humidity": True,
+        "show_wind":     True,
+        "bg_mode":       "color",
+        "bg_color":      [0, 0, 0],
+    },
 ]
 
 # ---------------------------------------------------------------------------
