@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/sysinfo.py                                              ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: System information collector - gathers CPU, memory, temperature,║
 ║              disk usage, and uptime statistics for monitoring dashboard.     ║

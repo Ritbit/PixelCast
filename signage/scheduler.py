@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/scheduler.py                                            ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Time-based display scheduler - manages on/off/dim rules by day  ║
 ║              of week and time. Runs as background daemon thread, checks      ║

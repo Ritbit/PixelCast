@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/transcoder.py                                           ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Video transcoding service - resizes uploaded videos to display  ║
 ║              resolution using ffmpeg. Reduces CPU load from 40-60% to 1-2%   ║

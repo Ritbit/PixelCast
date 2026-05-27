@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/weather.py                                     ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Weather display renderer using Open-Meteo API (free, no key).   ║
 ║              Shows current conditions and multi-day forecast with WMO icons. ║

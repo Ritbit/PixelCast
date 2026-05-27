@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/countdown.py                                   ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Countdown/countup timer renderer - flexible format with weeks,  ║
 ║              days, hours, minutes, seconds. Supports countdown to target or  ║

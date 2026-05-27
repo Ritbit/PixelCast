@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/web/app.py                                              ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Flask application factory - creates and configures Flask app    ║
 ║              with all blueprints, authentication, and filters.               ║

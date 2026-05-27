@@ -22,7 +22,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        daemon.py                                                       ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Main daemon entry point - initializes and coordinates all       ║
 ║              system components including matrix engine, web UI, scheduler,   ║

@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/playlist.py                                             ║
-║ Version:     1.1.0                                                           ║
+║ Version:     1.3.0                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Thread-safe playlist manager - loads, saves, and manages        ║
 ║              playlist items. Handles CRUD operations, navigation, reordering,║
