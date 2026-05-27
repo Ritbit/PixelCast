@@ -229,8 +229,16 @@ class GPIOOutput(BaseOutput):
 
     # ── BaseOutput API ────────────────────────────────────────────────────────
 
+    def create_canvas(self):
+        """Return a FrameCanvas for double-buffered / SwapOnVSync output."""
+        return self._matrix.CreateFrameCanvas()
+
+    def swap_canvas(self, canvas):
+        """Swap canvas to display; returns the new writable back canvas."""
+        return self._matrix.SwapOnVSync(canvas)
+
     def send_frame(self, image: Image.Image) -> None:
-        self._matrix.SetImage(image.convert('RGB'))
+        self._matrix.SetImage(image)   # caller guarantees RGB mode
 
     def set_brightness(self, pct: int) -> None:
         self._matrix.brightness = max(1, min(100, pct))

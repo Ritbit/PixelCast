@@ -35,6 +35,7 @@
 import os
 import json
 import time
+import queue
 import logging
 import threading
 import numpy as np
@@ -82,6 +83,101 @@ BOARD_PRESETS = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Dedicated output thread — decouples render from blocking GPIO/UDP output
+# ---------------------------------------------------------------------------
+
+class _OutputThread(threading.Thread):
+    """
+    Consumes numpy RGB frames from a single-slot queue and pushes them to
+    the output backend on its own thread.  For GPIO backends this uses
+    FrameCanvas + SwapOnVSync so the display never tears and the render
+    thread is never blocked waiting for the hardware swap.
+    """
+
+    def __init__(self, output, width: int, height: int):
+        super().__init__(daemon=True, name='OutputThread')
+        self._output  = output
+        self._width   = width
+        self._height  = height
+        self._queue   = queue.Queue(maxsize=1)
+        self._stop    = threading.Event()
+        self.dropped  = 0
+        self.frame_count = 0
+        self._t_last_fps = time.perf_counter()
+        self._fps_count  = 0
+
+        # GPIO path: persistent FrameCanvas for double-buffered swap
+        self._canvas = None
+        self._matrix_hw = None
+        if hasattr(output, 'create_canvas'):
+            try:
+                self._canvas    = output.create_canvas()
+                self._matrix_hw = output   # exposes swap_canvas()
+                log.info("OutputThread: FrameCanvas double-buffering enabled")
+            except Exception as e:
+                log.warning(f"OutputThread: FrameCanvas unavailable ({e}) "
+                            "— falling back to SetImage")
+
+    # ── public API (called from render thread) ─────────────────────────────
+
+    def submit(self, frame: np.ndarray) -> None:
+        """Non-blocking.  Drops the oldest pending frame if queue is full
+        so the display always shows the most recent content."""
+        if self._queue.full():
+            try:
+                self._queue.get_nowait()
+                self.dropped += 1
+            except queue.Empty:
+                pass
+        try:
+            self._queue.put_nowait(frame)
+        except queue.Full:
+            pass   # output thread just grabbed it — that's fine
+
+    def stop(self):
+        self._stop.set()
+
+    # ── thread body ───────────────────────────────────────────────────────
+
+    def run(self):
+        try:
+            os.sched_setaffinity(0, {2})   # pin output thread to core 2
+            log.info("OutputThread: started on core 2")
+        except (OSError, AttributeError):
+            log.info("OutputThread: started (CPU pinning not available)")
+        while not self._stop.is_set():
+            try:
+                frame = self._queue.get(timeout=0.02)
+            except queue.Empty:
+                continue
+            self._send(frame)
+
+    def _send(self, frame: np.ndarray) -> None:
+        # Zero-copy PIL view — frombuffer wraps the numpy memory directly.
+        # The frame array stays alive (held by local ref) for the duration
+        # of SetImage; no allocation, no memcpy.
+        pil = Image.frombuffer(
+            'RGB', (self._width, self._height),
+            frame, 'raw', 'RGB', 0, 1)
+
+        if self._canvas is not None:
+            self._canvas.SetImage(pil, unsafe=True)
+            self._canvas = self._matrix_hw.swap_canvas(self._canvas)
+        else:
+            self._output.send_frame(pil)
+
+        self.frame_count += 1
+        self._fps_count  += 1
+        now = time.perf_counter()
+        if now - self._t_last_fps >= 10.0:
+            fps = self._fps_count / (now - self._t_last_fps)
+            log.debug(f"OutputThread: {fps:.1f} fps "
+                      f"(dropped={self.dropped})")
+            self._fps_count  = 0
+            self._t_last_fps = now
+
+
 class MatrixEngine:
     def __init__(self, config_path: str, playlist):
         self.playlist       = playlist
@@ -96,12 +192,17 @@ class MatrixEngine:
         self.width  = self.cfg['display_width']
         self.height = self.cfg['display_height']
         self.output = create_output(self.cfg)
-        self._current_frame = np.zeros(
+        self._current_frame   = np.zeros(
             (self.height, self.width, 3), dtype=np.uint8)
         self._last_frame_time = time.time()   # for watchdog
         self._test_mode       = threading.Event()  # set = screen test active
-        self._alert_mgr      = None   # AlertManager instance
+        self._alert_mgr       = None   # AlertManager instance
         self._frame_cache     = {}   # item_id → pre-rendered first frame
+
+        # Dedicated output thread (P1.1) — decouples render from GPIO blocking
+        self._out_thread = _OutputThread(self.output, self.width, self.height)
+        self._out_thread.start()
+
         log.info(f"MatrixEngine ready: {self.width}x{self.height}")
 
     def _load_config(self, path):
@@ -134,6 +235,7 @@ class MatrixEngine:
     def stop(self):
         self._stop_event.set()
         self._skip_event.set()
+        self._out_thread.stop()
 
     def skip(self):
         self._skip_event.set()
@@ -173,6 +275,16 @@ class MatrixEngine:
             'resolution': f"{self.width}x{self.height}"
         }
 
+    def get_perf_stats(self) -> dict:
+        """Return live output-thread performance counters."""
+        t = self._out_thread
+        return {
+            'frames_output': t.frame_count,
+            'frames_dropped': t.dropped,
+            'canvas_mode': 'FrameCanvas+SwapOnVSync' if t._canvas is not None
+                           else 'SetImage (no FrameCanvas)',
+        }
+
     # ------------------------------------------------------------------
     # Frame output
     # ------------------------------------------------------------------
@@ -183,19 +295,23 @@ class MatrixEngine:
         # While a screen test is running, only the test thread may write frames
         if self._test_mode.is_set() and not _from_test:
             return
+        # Normalise to display size only when the shape is wrong (rare path)
         if frame.shape != (self.height, self.width, 3):
             img   = Image.fromarray(frame.astype(np.uint8))
             img   = img.resize((self.width, self.height), Image.LANCZOS)
-            frame = np.array(img)
+            frame = np.array(img, dtype=np.uint8)
+        # Keep a reference (not a copy) for wipe-out source reads.
+        # All renderers produce fresh arrays per frame so this is safe.
         with self._lock:
-            self._current_frame  = frame.copy()
+            self._current_frame   = frame
             self._last_frame_time = time.time()
         # Apply alert overlay if active
         if self._alert_mgr is not None:
             alert_frame = self._alert_mgr.get_frame(frame, self.width, self.height)
             if alert_frame is not None:
                 frame = alert_frame
-        self.output.send_frame(Image.fromarray(frame.astype(np.uint8), 'RGB'))
+        # Submit to output thread — non-blocking, render continues immediately
+        self._out_thread.submit(frame)
 
     def black(self):
         self.show_frame(np.zeros((self.height, self.width, 3), dtype=np.uint8))
@@ -204,6 +320,8 @@ class MatrixEngine:
         with self._lock:
             if self._current_frame is None:
                 return np.zeros((self.height, self.width, 3), dtype=np.uint8)
+            # .copy() here because callers pass this to transition src which
+            # reads it while we may store a new ref; cheap 98 KB once per item.
             return self._current_frame.copy()
 
     # ------------------------------------------------------------------
@@ -239,14 +357,18 @@ class MatrixEngine:
             return True
         try:
             transition = get_transition(name, speed)
-            frames     = list(transition.frames(src, dst, self.width, self.height))
-            # Ensure last frame is exactly dst to avoid colour drift
-            if len(frames) > 0:
-                frames[-1] = dst.copy()
-            for frame in frames:
+            # P1.4: stream frames directly — never materialise the full list.
+            # First frame is shown within one render iteration instead of
+            # waiting for the entire transition to be pre-computed.
+            last_frame = None
+            for frame in transition.frames(src, dst, self.width, self.height):
                 if self._stop_event.is_set() or self._skip_event.is_set():
                     return False
+                last_frame = frame
                 self.show_frame(frame)
+            # Ensure final frame is exactly dst to prevent colour drift
+            if last_frame is None or not np.array_equal(last_frame, dst):
+                self.show_frame(dst)
             return True
         except Exception as e:
             log.error(f"Transition '{name}' failed: {e}")
@@ -258,6 +380,14 @@ class MatrixEngine:
     # ------------------------------------------------------------------
     def run(self):
         from signage.renderer import get_renderer
+
+        # P3.2: Pin render thread to core 1; output thread is on core 2,
+        # C++ GPIO refresh thread is on core 3 (pinned in GPIOOutput.__init__)
+        try:
+            os.sched_setaffinity(0, {1})
+            log.info("Render thread pinned to CPU core 1")
+        except (OSError, AttributeError):
+            pass
 
         log.info("Display loop starting")
 

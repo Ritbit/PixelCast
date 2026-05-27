@@ -213,18 +213,21 @@ class MeltTransition(BaseTransition):
     def frames(self, src, dst, w, h):
         offsets = np.random.randint(0, h // 2, size=w)
         speeds  = np.random.randint(1, max(2, h // self.STEPS), size=w)
-        done    = np.zeros(w, dtype=bool)
+        frame   = dst.copy()   # reuse across steps
         for _ in range(self.STEPS * 2):
-            frame = dst.copy()
-            for x in range(w):
-                off = int(offsets[x])
-                if off < h:
-                    frame[:h - off, x, :] = src[off:, x, :]
-                else:
-                    done[x] = True
+            np.copyto(frame, dst)
+            # Vectorised: for each column x, copy src rows [off:] to frame rows [:h-off]
+            # Columns are independent so we loop over unique offset values (much fewer
+            # than w iterations when steps are large) — but numpy advanced indexing
+            # is faster than a Python per-column loop regardless.
+            for off_val in np.unique(offsets):
+                if off_val >= h:
+                    continue
+                cols = np.where(offsets == off_val)[0]
+                frame[:h - off_val, cols, :] = src[off_val:, cols, :]
             yield frame
             offsets = np.minimum(offsets + speeds, h)
-            if done.all():
+            if np.all(offsets >= h):
                 break
         yield dst.copy()
 
@@ -251,16 +254,18 @@ class SnowTransition(BaseTransition):
 class SpiralTransition(BaseTransition):
     def frames(self, src, dst, w, h):
         cx, cy  = w // 2, h // 2
-        coords  = []
+        rows_out = []
+        cols_out = []
         visited = set()
         x, y    = cx, cy
         dx, dy  = 1, 0
         steps   = 1
         count   = 0
         turn    = 0
-        while len(coords) < w * h:
+        while len(rows_out) < w * h:
             if 0 <= x < w and 0 <= y < h and (x, y) not in visited:
-                coords.append((y, x))
+                rows_out.append(y)
+                cols_out.append(x)
                 visited.add((x, y))
             x += dx
             y += dy
@@ -273,15 +278,21 @@ class SpiralTransition(BaseTransition):
                     steps += 1
             if len(visited) >= w * h:
                 break
-        total = len(coords)
-        chunk = max(1, total // self.STEPS)
-        frame = src.copy()
+        # Pre-build flat index arrays for vectorised bulk assignment
+        row_idx = np.array(rows_out, dtype=np.intp)
+        col_idx = np.array(cols_out, dtype=np.intp)
+        total   = len(row_idx)
+        chunk   = max(1, total // self.STEPS)
+        frame   = src.copy()
+        src_flat = src.reshape(-1, 3)
+        dst_flat = dst.reshape(-1, 3)
         for i in range(self.STEPS):
-            start = i * chunk
-            end   = min(start + chunk, total)
-            for j in range(start, end):
-                r, c = coords[j]
-                frame[r, c, :] = dst[r, c, :]
+            end = min((i + 1) * chunk, total)
+            r   = row_idx[:end]
+            c   = col_idx[:end]
+            # Vectorised bulk assignment — no Python loop over pixels
+            flat = r * w + c
+            frame.reshape(-1, 3)[flat] = dst_flat[flat]
             yield frame.copy()
         yield dst.copy()
 
@@ -290,19 +301,25 @@ class DropTransition(BaseTransition):
     def frames(self, src, dst, w, h):
         delays      = np.random.randint(0, self.STEPS // 2, size=w)
         total_steps = self.STEPS + self.STEPS // 2
+        frame       = src.copy()   # reused scratch buffer
         for step in range(total_steps):
-            frame = src.copy()
-            for x in range(w):
-                if step < delays[x]:
-                    continue
-                progress = step - delays[x]
-                t        = min(progress / self.STEPS, 1.0)
-                t_ease   = t * t
-                drop_h   = int(h * t_ease)
-                if drop_h >= h:
-                    frame[:, x, :] = dst[:, x, :]
-                else:
-                    frame[:drop_h, x, :] = dst[h - drop_h:, x, :]
+            np.copyto(frame, src)
+            # Vectorised: compute drop_h for every column simultaneously
+            progress = np.maximum(0, step - delays).astype(np.float32)
+            t_ease   = np.clip(progress / self.STEPS, 0.0, 1.0) ** 2
+            drop_h   = (h * t_ease).astype(np.intp)   # shape (w,)
+
+            # Full columns (drop_h >= h) — paste entire dst column
+            full = drop_h >= h
+            if full.any():
+                frame[:, full, :] = dst[:, full, :]
+
+            # Partial columns — group by drop_h value to minimise Python iters
+            partial_cols = np.where((drop_h > 0) & ~full)[0]
+            if partial_cols.size:
+                for dh in np.unique(drop_h[partial_cols]):
+                    cols = partial_cols[drop_h[partial_cols] == dh]
+                    frame[:dh, cols, :] = dst[h - dh:, cols, :]
             yield frame
         yield dst.copy()
 

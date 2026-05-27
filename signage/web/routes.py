@@ -1488,6 +1488,16 @@ def stats_data():
     return jsonify(full_stats())
 
 
+@system_bp.route('/perf')
+@login_required
+def perf():
+    """Return output-thread performance counters (frames, dropped, canvas mode)."""
+    engine = current_app.config.get('ENGINE')
+    if engine is None:
+        return jsonify({'error': 'engine not running'}), 503
+    return jsonify(engine.get_perf_stats())
+
+
 # ---------------------------------------------------------------------------
 # Config backup & restore
 # ---------------------------------------------------------------------------

@@ -76,8 +76,10 @@ class VideoRenderer(BaseRenderer):
         self._bg_cache      = None   # cached background PIL image
 
         self._open()
-        # Pre-build background canvas once — reused for every frame
+        # Pre-build background canvas once; also cache as numpy for fast copy
         self._bg_cache = load_background(width, height, item)
+        # Pre-computed numpy bg array — avoids PIL Image.copy() per frame
+        self._bg_np    = np.array(self._bg_cache, dtype=np.uint8)
         if self._want_prebuf and self._container is not None:
             self._prebuf_thread = threading.Thread(
                 target=self._do_prebuffer, daemon=True,
@@ -112,18 +114,36 @@ class VideoRenderer(BaseRenderer):
         Background is cached — only the video frame is resized per-frame.
         """
         # For corner sampling: resolve bg on first real frame, then cache
-        if self._bg_cache is None or            (self._item.get('bg_mode') == 'corner' and self._first is None):
+        if self._bg_cache is None or \
+                (self._item.get('bg_mode') == 'corner' and self._first is None):
             self._bg_cache = load_background(
                 self.width, self.height, self._item, pil_img)
+            self._bg_np = np.array(self._bg_cache, dtype=np.uint8)
 
-        sized  = fit_image(pil_img, self.width, self.height,
-                           self._scale_mode, self._scale_factor,
-                           fast=True)   # BILINEAR — adequate for video on LED
-        canvas = self._bg_cache.copy()   # cheap pixel copy, no I/O
-        paste_at(canvas, sized, self._position)
-        if canvas.mode != 'RGB':
-            canvas = canvas.convert('RGB')
-        return np.array(canvas, dtype=np.uint8)
+        # Resize the video frame (BILINEAR — adequate quality for LED panels)
+        sized = fit_image(pil_img, self.width, self.height,
+                          self._scale_mode, self._scale_factor,
+                          fast=True)
+        sized_np = np.asarray(sized, dtype=np.uint8)  # view, no copy if already uint8
+
+        # P3: Start from numpy bg copy instead of PIL Image allocation
+        canvas = self._bg_np.copy()
+
+        # Compute paste position (mirrors paste_at logic, pure numpy)
+        iw, ih = sized.size
+        cw, ch = self.width, self.height
+        x = 0 if 'left' in self._position else \
+            cw - iw if 'right' in self._position else (cw - iw) // 2
+        y = 0 if 'top'  in self._position else \
+            ch - ih if 'bottom' in self._position else (ch - ih) // 2
+        # Clamp to canvas bounds
+        x0, y0 = max(0, x), max(0, y)
+        x1, y1 = min(cw, x + iw), min(ch, y + ih)
+        sx, sy = x0 - x, y0 - y
+        if x1 > x0 and y1 > y0:
+            canvas[y0:y1, x0:x1] = sized_np[sy:sy+(y1-y0), sx:sx+(x1-x0)]
+
+        return canvas
 
     def _do_prebuffer(self):
         import av
