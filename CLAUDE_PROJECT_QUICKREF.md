@@ -27,8 +27,13 @@ journalctl -u led-signage -f
 ## Display
 - Resolution: **256×128** px
 - Frame format: `numpy (128, 256, 3) uint8 RGB`
-- Engine owns `RGBMatrix` exclusively — only `show_frame()` calls `SetImage()`
+- `show_frame()` submits frame to `_OutputThread` (non-blocking) — never blocks on GPIO
+- `_OutputThread` calls `FrameCanvas.SetImage(pil, unsafe=True)` then `matrix.SwapOnVSync(canvas)` — tearing-free double-buffer swap
+- PIL image is a zero-copy `Image.frombuffer()` view into the numpy array (no allocation)
+- Queue `maxsize=1` — stale frames dropped, display always shows latest
+- CPU layout: render→core 1, output→core 2, C++ GPIO refresh→core 3
 - Brightness: 0–100 (stored in panel.json, applied at matrix init)
+- `engine.get_perf_stats()` → `{frames_output, frames_dropped, canvas_mode}` | `GET /system/perf`
 
 ## Adding a New Renderer
 1. Create `signage/renderer/mytype.py` extending `BaseRenderer`
