@@ -109,8 +109,10 @@
 
 ### Threading model
 ```
-main thread       → shutdown_event.wait()
-MatrixEngine      → daemon thread, owns RGBMatrix exclusively
+main thread       → shutdown_event.wait()                         CPU 0
+MatrixEngine      → daemon thread, runs render loop               CPU 1 (pinned)
+_OutputThread     → daemon thread, FrameCanvas + SwapOnVSync      CPU 2 (pinned)
+C++ GPIO refresh  → spawned by RGBMatrix, PWM scanning            CPU 3 (pinned)
 Scheduler         → daemon thread, checks rules every 30s
 Watchdog          → daemon thread, restarts engine if frame age > timeout
 Flask/Werkzeug    → daemon thread
@@ -118,6 +120,14 @@ AlertManager      → no thread — composites in show_frame() on engine thread
 PreRender         → short-lived daemon threads, one per next-item peek
 VideoPreBuffer    → daemon thread per video item
 ```
+
+**Output pipeline:**
+
+- `show_frame()` submits to `_OutputThread` via `queue.Queue(maxsize=1)` — non-blocking
+- `_OutputThread._send()` calls `FrameCanvas.SetImage(pil, unsafe=True)` then `matrix.SwapOnVSync(canvas)` — atomic tearing-free swap
+- PIL image created via `Image.frombuffer()` (zero-copy numpy view, no allocation)
+- Stale frames are dropped from the queue; display always shows latest content
+- `GPIOOutput.create_canvas()` / `swap_canvas()` expose FrameCanvas API
 
 ### Display loop (matrix.py — MatrixEngine.run())
 ```
@@ -137,6 +147,7 @@ advance playlist → check date range → create renderer → get first_frame()
 - Alert overlay: `show_frame()` calls `_alert_mgr.get_frame()` and replaces frame if alert active
 - Frame cache: `{item_id → numpy frame}` — pre-renders next static item during current item's playback
 - Auto-duration grace: 0.15s after `_done` fires before advancing (lets last content clear screen)
+- Transitions are **streamed** (generator, not pre-computed list) — first frame shown within first iteration
 
 ### Renderer contract
 ```python
@@ -451,6 +462,7 @@ Legacy single-text format also accepted: `{"text": "...", "color": [R,G,B], "dur
 | schedule | POST /schedule/delete_rule/<idx> | editor | Delete rule |
 | system | GET /system/logs | viewer | Log viewer |
 | system | GET /system/stats | viewer | System stats |
+| system | GET /system/perf | viewer | Output-thread perf counters (frames, dropped, canvas mode) |
 | system | GET /system/backup | viewer | Download backup |
 | system | POST /system/restore | admin | Restore backup |
 
