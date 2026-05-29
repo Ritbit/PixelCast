@@ -104,8 +104,9 @@ class _OutputThread(threading.Thread):
         self._stop    = threading.Event()
         self.dropped  = 0
         self.frame_count = 0
-        self._t_last_fps = time.perf_counter()
-        self._fps_count  = 0
+        self._t_last_fps   = time.perf_counter()
+        self._fps_count    = 0
+        self._current_fps  = 0.0
 
         # GPIO path: persistent FrameCanvas for double-buffered swap
         self._canvas = None
@@ -172,6 +173,7 @@ class _OutputThread(threading.Thread):
         now = time.perf_counter()
         if now - self._t_last_fps >= 10.0:
             fps = self._fps_count / (now - self._t_last_fps)
+            self._current_fps = fps
             log.debug(f"OutputThread: {fps:.1f} fps "
                       f"(dropped={self.dropped})")
             self._fps_count  = 0
@@ -281,6 +283,7 @@ class MatrixEngine:
         return {
             'frames_output': t.frame_count,
             'frames_dropped': t.dropped,
+            'fps': round(t._current_fps, 1),
             'canvas_mode': 'FrameCanvas+SwapOnVSync' if t._canvas is not None
                            else 'SetImage (no FrameCanvas)',
         }

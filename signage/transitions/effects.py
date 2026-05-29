@@ -70,98 +70,106 @@ class FadeBlackTransition(BaseTransition):
 
 class WipeLeftTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = src.copy()
         for i in range(self.STEPS):
             t     = self._ease(i / (self.STEPS - 1))
             split = int(w * t)
-            frame = src.copy()
+            np.copyto(frame, src)
             if split > 0:
                 frame[:, w - split:, :] = dst[:, w - split:, :]
-            yield frame
+            yield frame.copy()
 
 
 class WipeRightTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = src.copy()
         for i in range(self.STEPS):
             t     = self._ease(i / (self.STEPS - 1))
             split = int(w * t)
-            frame = src.copy()
+            np.copyto(frame, src)
             if split > 0:
                 frame[:, :split, :] = dst[:, :split, :]
-            yield frame
+            yield frame.copy()
 
 
 class WipeUpTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = src.copy()
         for i in range(self.STEPS):
             t     = self._ease(i / (self.STEPS - 1))
             split = int(h * t)
-            frame = src.copy()
+            np.copyto(frame, src)
             if split > 0:
                 frame[h - split:, :, :] = dst[h - split:, :, :]
-            yield frame
+            yield frame.copy()
 
 
 class WipeDownTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = src.copy()
         for i in range(self.STEPS):
             t     = self._ease(i / (self.STEPS - 1))
             split = int(h * t)
-            frame = src.copy()
+            np.copyto(frame, src)
             if split > 0:
                 frame[:split, :, :] = dst[:split, :, :]
-            yield frame
+            yield frame.copy()
 
 
 class SlideLeftTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = np.empty_like(src)
         for i in range(self.STEPS):
             t      = self._ease(i / (self.STEPS - 1))
             offset = int(w * t)
-            frame  = np.zeros_like(src)
+            frame[:] = 0
             if offset < w:
                 frame[:, :w - offset, :] = src[:, offset:, :]
             if offset > 0:
                 frame[:, w - offset:, :] = dst[:, :offset, :]
-            yield frame
+            yield frame.copy()
 
 
 class SlideRightTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = np.empty_like(src)
         for i in range(self.STEPS):
             t      = self._ease(i / (self.STEPS - 1))
             offset = int(w * t)
-            frame  = np.zeros_like(src)
+            frame[:] = 0
             if offset < w:
                 frame[:, offset:, :] = src[:, :w - offset, :]
             if offset > 0:
                 frame[:, :offset, :] = dst[:, w - offset:, :]
-            yield frame
+            yield frame.copy()
 
 
 class SlideUpTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = np.empty_like(src)
         for i in range(self.STEPS):
             t      = self._ease(i / (self.STEPS - 1))
             offset = int(h * t)
-            frame  = np.zeros_like(src)
+            frame[:] = 0
             if offset < h:
                 frame[:h - offset, :, :] = src[offset:, :, :]
             if offset > 0:
                 frame[h - offset:, :, :] = dst[:offset, :, :]
-            yield frame
+            yield frame.copy()
 
 
 class SlideDownTransition(BaseTransition):
     def frames(self, src, dst, w, h):
+        frame = np.empty_like(src)
         for i in range(self.STEPS):
             t      = self._ease(i / (self.STEPS - 1))
             offset = int(h * t)
-            frame  = np.zeros_like(src)
+            frame[:] = 0
             if offset < h:
                 frame[offset:, :, :] = src[:h - offset, :, :]
             if offset > 0:
                 frame[:offset, :, :] = dst[h - offset:, :, :]
-            yield frame
+            yield frame.copy()
 
 
 class ZoomInTransition(BaseTransition):
@@ -225,7 +233,7 @@ class MeltTransition(BaseTransition):
                     continue
                 cols = np.where(offsets == off_val)[0]
                 frame[:h - off_val, cols, :] = src[off_val:, cols, :]
-            yield frame
+            yield frame.copy()
             offsets = np.minimum(offsets + speeds, h)
             if np.all(offsets >= h):
                 break
@@ -252,35 +260,42 @@ class SnowTransition(BaseTransition):
 
 
 class SpiralTransition(BaseTransition):
+    _walk_cache: dict = {}   # (w, h) → (row_idx, col_idx) — computed once per resolution
+
     def frames(self, src, dst, w, h):
-        cx, cy  = w // 2, h // 2
-        rows_out = []
-        cols_out = []
-        visited = set()
-        x, y    = cx, cy
-        dx, dy  = 1, 0
-        steps   = 1
-        count   = 0
-        turn    = 0
-        while len(rows_out) < w * h:
-            if 0 <= x < w and 0 <= y < h and (x, y) not in visited:
-                rows_out.append(y)
-                cols_out.append(x)
-                visited.add((x, y))
-            x += dx
-            y += dy
-            count += 1
-            if count == steps:
-                count = 0
-                dx, dy = -dy, dx
-                turn  += 1
-                if turn % 2 == 0:
-                    steps += 1
-            if len(visited) >= w * h:
-                break
-        # Pre-build flat index arrays for vectorised bulk assignment
-        row_idx = np.array(rows_out, dtype=np.intp)
-        col_idx = np.array(cols_out, dtype=np.intp)
+        key = (w, h)
+        if key not in SpiralTransition._walk_cache:
+            cx, cy   = w // 2, h // 2
+            rows_out = []
+            cols_out = []
+            visited  = set()
+            x, y     = cx, cy
+            dx, dy   = 1, 0
+            steps    = 1
+            count    = 0
+            turn     = 0
+            while len(rows_out) < w * h:
+                if 0 <= x < w and 0 <= y < h and (x, y) not in visited:
+                    rows_out.append(y)
+                    cols_out.append(x)
+                    visited.add((x, y))
+                x += dx
+                y += dy
+                count += 1
+                if count == steps:
+                    count = 0
+                    dx, dy = -dy, dx
+                    turn  += 1
+                    if turn % 2 == 0:
+                        steps += 1
+                if len(visited) >= w * h:
+                    break
+            SpiralTransition._walk_cache[key] = (
+                np.array(rows_out, dtype=np.intp),
+                np.array(cols_out, dtype=np.intp),
+            )
+        # Pre-built flat index arrays for vectorised bulk assignment
+        row_idx, col_idx = SpiralTransition._walk_cache[key]
         total   = len(row_idx)
         chunk   = max(1, total // self.STEPS)
         frame   = src.copy()
@@ -320,7 +335,7 @@ class DropTransition(BaseTransition):
                 for dh in np.unique(drop_h[partial_cols]):
                     cols = partial_cols[drop_h[partial_cols] == dh]
                     frame[:dh, cols, :] = dst[h - dh:, cols, :]
-            yield frame
+            yield frame.copy()
         yield dst.copy()
 
 
@@ -328,32 +343,34 @@ class BlindsHTransition(BaseTransition):
     STRIPS = 8
     def frames(self, src, dst, w, h):
         strip_h = max(1, h // self.STRIPS)
+        frame   = src.copy()
         for i in range(self.STEPS):
             t     = self._ease(i / (self.STEPS - 1))
             open_ = int(strip_h * t)
-            frame = src.copy()
+            np.copyto(frame, src)
             for s in range(self.STRIPS):
                 y0 = s * strip_h
                 y1 = min(y0 + open_, y0 + strip_h, h)
                 if y1 > y0:
                     frame[y0:y1, :, :] = dst[y0:y1, :, :]
-            yield frame
+            yield frame.copy()
 
 
 class BlindsVTransition(BaseTransition):
     STRIPS = 8
     def frames(self, src, dst, w, h):
         strip_w = max(1, w // self.STRIPS)
+        frame   = src.copy()
         for i in range(self.STEPS):
             t     = self._ease(i / (self.STEPS - 1))
             open_ = int(strip_w * t)
-            frame = src.copy()
+            np.copyto(frame, src)
             for s in range(self.STRIPS):
                 x0 = s * strip_w
                 x1 = min(x0 + open_, x0 + strip_w, w)
                 if x1 > x0:
                     frame[:, x0:x1, :] = dst[:, x0:x1, :]
-            yield frame
+            yield frame.copy()
 
 
 class CheckerboardTransition(BaseTransition):
