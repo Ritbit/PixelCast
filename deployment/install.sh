@@ -3,7 +3,7 @@
 # PixelCast - Professional LED Matrix Signage System
 # ==============================================================================
 # File:        deployment/install.sh
-# Version:     1.0.0
+# Version:     1.3.0
 # Author:      B. van Ritbergen <bas@ritbit.com>    
 # Description: Complete installation script for PixelCast on Raspberry Pi.
 #              Installs system dependencies, Python packages, RGB matrix
@@ -45,7 +45,12 @@ apt-get install -y \
     libavcodec-dev libavformat-dev libswscale-dev \
     libavdevice-dev libavutil-dev \
     fonts-dejavu-core fonts-freefont-ttf \
-    wget curl nginx
+    wget curl nginx \
+    lm-sensors \
+    rsync \
+    openssh-server \
+    avahi-daemon libnss-mdns \
+    overlayroot
 log "Dependencies installed"
 
 # =============================================================================
@@ -155,7 +160,13 @@ EOF
 fi
 
 # =============================================================================
-step "8. Install systemd service"
+step "8. Enable mDNS (avahi) for .local hostname access"
+# =============================================================================
+systemctl enable --now avahi-daemon
+log "Avahi mDNS daemon enabled — device reachable as $(hostname).local"
+
+# =============================================================================
+step "9. Install systemd service"
 # =============================================================================
 SERVICE_SRC="$SIGNAGE_DIR/deployment/systemd/PixelCast.service"
 SERVICE_DST="/etc/systemd/system/PixelCast.service"
@@ -174,6 +185,50 @@ if [ -f "$SERVICE_SRC" ]; then
 else
     warn "Service file not found at $SERVICE_SRC — skipping systemd setup"
 fi
+
+# =============================================================================
+step "10. SD card protection — overlay filesystem"
+# =============================================================================
+# Configures the root filesystem as read-only with a tmpfs overlay so that
+# normal runtime writes (logs, tmp files) go to RAM and are discarded on
+# reboot.  Application updates are written through the overlay via deploy.sh.
+#
+# Three things are needed that raspi-config alone does NOT do:
+#   1. overlayroot=tmpfs in cmdline.txt          (raspi-config does this)
+#   2. /etc/overlayroot.local.conf               (overrides package default)
+#   3. 'overlay' listed in initramfs-tools/modules so modules.dep is correct
+
+CMDLINE="/boot/firmware/cmdline.txt"
+[ -f "$CMDLINE" ] || CMDLINE="/boot/cmdline.txt"
+
+# 1. Ensure overlayroot=tmpfs is in cmdline.txt
+if ! grep -q 'overlayroot=tmpfs' "$CMDLINE"; then
+    # Prepend so it is read early by the initramfs
+    sed -i 's/^/overlayroot=tmpfs /' "$CMDLINE"
+    log "overlayroot=tmpfs added to $CMDLINE"
+else
+    log "overlayroot=tmpfs already in $CMDLINE"
+fi
+
+# 2. Create overlayroot.local.conf (takes precedence over package-managed conf)
+if [ ! -f /etc/overlayroot.local.conf ]; then
+    echo 'overlayroot="tmpfs"' > /etc/overlayroot.local.conf
+    log "Created /etc/overlayroot.local.conf"
+else
+    log "/etc/overlayroot.local.conf already exists"
+fi
+
+# 3. Ensure the overlay kernel module is indexed in the initramfs modules.dep
+if ! grep -qx 'overlay' /etc/initramfs-tools/modules 2>/dev/null; then
+    echo 'overlay' >> /etc/initramfs-tools/modules
+    log "overlay module added to /etc/initramfs-tools/modules"
+else
+    log "overlay module already in /etc/initramfs-tools/modules"
+fi
+
+# Rebuild initramfs with all three changes baked in
+update-initramfs -u
+log "Initramfs rebuilt — overlay will activate on next reboot"
 
 # =============================================================================
 echo ""
@@ -200,5 +255,7 @@ echo ""
 echo " IMPORTANT: On first access, you will be prompted to create"
 echo " an admin account. Please choose a strong password."
 echo ""
-echo " NOTE: Reboot recommended to apply audio disable."
+echo " NOTE: Reboot required to activate:"
+echo "        - Audio disable (PWM conflict fix)"
+echo "        - Overlay filesystem (read-only SD card protection)"
 echo "============================================================"
