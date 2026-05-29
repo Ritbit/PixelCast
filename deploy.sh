@@ -75,12 +75,26 @@ for candidate in /media/root-ro /overlay/lower; do
 done
 
 if [ -n "$OVERLAY_LOWER" ]; then
-    # Strategy A: overlay active — lower dir bind-mounted read-only, remount rw
-    mount -o remount,rw "$OVERLAY_LOWER"
-    DEPLOY_ROOT="$OVERLAY_LOWER"
-    echo "  Overlay mode (Strategy A) — writing to $DEPLOY_ROOT"
-else
-    # Strategy B: mount root block device directly
+    # Strategy A: overlay active.
+    # The kernel refuses to remount a filesystem that is in use as an overlay
+    # lower dir (EBUSY), so we must NOT do 'remount,ro' on OVERLAY_LOWER.
+    # Instead, look up the underlying block device and mount it at a fresh
+    # temp path — exactly like Strategy B, but device is from findmnt.
+    ROOT_DEV=$(findmnt --noheadings --output SOURCE "$OVERLAY_LOWER" 2>/dev/null | head -1)
+    if [ -b "$ROOT_DEV" ]; then
+        MOUNTED_TMP="/mnt/root-rw"
+        mkdir -p "$MOUNTED_TMP"
+        mount -o rw "$ROOT_DEV" "$MOUNTED_TMP"
+        DEPLOY_ROOT="$MOUNTED_TMP"
+        echo "  Overlay mode (Strategy A) — mounted $ROOT_DEV → $MOUNTED_TMP"
+    else
+        echo "  ⚠ Overlay at $OVERLAY_LOWER but device not found — falling through to Strategy B"
+    fi
+fi
+
+if [ -z "$DEPLOY_ROOT" ]; then
+    # Strategy B: no overlay lower-dir found (or device lookup failed above).
+    # Detect root block device from /proc/cmdline and mount directly.
     ROOT_SPEC=$(grep -oP 'root=\K\S+' /proc/cmdline | head -1)
     if [[ "$ROOT_SPEC" == PARTUUID=* ]]; then
         ROOT_DEV=$(blkid -l -t "PARTUUID=${ROOT_SPEC#PARTUUID=}" -o device 2>/dev/null || true)
@@ -105,7 +119,7 @@ INSTALL_DIR="${DEPLOY_ROOT}/opt/PixelCast/led-signage"
 
 # ── Extract application ───────────────────────────────────────────────────────
 mkdir -p "$INSTALL_DIR"
-tar -xzf /tmp/led-signage.tar.gz -C "$INSTALL_DIR"
+tar -xzf /tmp/led-signage.tar.gz -C "$INSTALL_DIR" --warning=no-timestamp
 rm -f /tmp/led-signage.tar.gz
 
 # Remove stale top-level files left by old bad deploys
