@@ -386,6 +386,17 @@
           Semicolon-separated list. Options: U-mapper, Rotate:N, Mirror:H/V
         </div>
       </div>
+      <div class="form-group">
+        <label>Beeper GPIO pin (BCM)</label>
+        <input type="number" name="beeper_gpio"
+               value="{{ panel_cfg.get('beeper_gpio', 0) }}"
+               min="0" max="27" placeholder="0 = disabled">
+        <div class="setting-desc">
+          Active buzzer on BCM GPIO pin. <strong>0 = disabled.</strong><br>
+          Recommended free pins: 16 or 26 (regular mapping, 2 parallel).
+          Requires restart to take effect.
+        </div>
+      </div>
       <div class="form-group" style="display:flex; gap:20px; align-items:center; padding-top:18px;">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
           <input type="checkbox" name="disable_hardware_pulsing" value="1"
@@ -412,6 +423,69 @@
       </span>
     </div>
   </form>
+
+  <!-- ── Beeper test ──────────────────────────────────────────────────── -->
+  <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+    <div style="font-size:12px; font-weight:600; color:var(--muted);
+                text-transform:uppercase; letter-spacing:.05em;
+                margin-bottom:10px;">Beeper Test</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <select id="beep-pattern" style="width:auto; padding:6px 10px; border:1px solid var(--border); background:var(--surface2,#1a1e2e); color:inherit; border-radius:4px;">
+        <option value="triple">triple — 3 × 0.5 s</option>
+        <option value="short">short — 0.5 s</option>
+        <option value="long">long — 1.0 s</option>
+        <option value="alert">alert — continuous 1 s on/off</option>
+      </select>
+      <button type="button" class="btn btn-secondary" onclick="testBeep()">&#128276; Test Beep</button>
+      <button type="button" class="btn btn-danger" id="beep-stop-btn"
+              onclick="stopBeep()" style="display:none;">Stop</button>
+      <span id="beep-status" style="font-size:12px; color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    const csrfToken = () =>
+      document.querySelector('[name=csrf_token]')?.value || '';
+
+    window.testBeep = function () {
+      const pattern = document.getElementById('beep-pattern').value;
+      const status  = document.getElementById('beep-status');
+      const stopBtn = document.getElementById('beep-stop-btn');
+      status.textContent = 'Sending\u2026';
+      stopBtn.style.display = 'none';
+      fetch('/system/beep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': csrfToken() },
+        body: JSON.stringify({ pattern })
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          status.textContent = '\u2713 Beeping on GPIO ' + d.gpio;
+          if (pattern === 'alert') stopBtn.style.display = '';
+          else setTimeout(() => { status.textContent = ''; }, 4000);
+        } else {
+          status.textContent = '\u26a0 ' + (d.error || 'Error');
+        }
+      })
+      .catch(() => { status.textContent = '\u26a0 Request failed'; });
+    };
+
+    window.stopBeep = function () {
+      fetch('/system/beep', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'X-CSRFToken': csrfToken() },
+        body: JSON.stringify({ pattern: 'stop' })
+      });
+      document.getElementById('beep-status').textContent = '';
+      document.getElementById('beep-stop-btn').style.display = 'none';
+    };
+  })();
+  </script>
+
 </div>
 
 <!-- ================================================================ -->

@@ -267,6 +267,7 @@ def settings():
                     'limit_refresh':       int(request.form.get('limit_refresh', 0)),
                     'disable_hardware_pulsing': request.form.get('disable_hardware_pulsing') == '1',
                     'show_refresh_rate':   request.form.get('show_refresh_rate') == '1',
+                    'beeper_gpio':         int(request.form.get('beeper_gpio') or 0),
                     'output_type':            request.form.get('output_type', 'gpio'),
                     'colorlight_ip':          request.form.get('colorlight_ip', '192.168.0.20'),
                     'colorlight_port':        int(request.form.get('colorlight_port', 7000)),
@@ -1521,6 +1522,10 @@ def beep_test():
 
     data    = request.get_json(silent=True) or {}
     pattern = data.get('pattern', 'triple')
+
+    if pattern == 'stop':
+        beeper.stop()
+        return jsonify({'ok': True, 'pattern': 'stop', 'gpio': beeper.gpio_pin})
 
     from signage.beeper import _PATTERNS
     if pattern not in _PATTERNS:
