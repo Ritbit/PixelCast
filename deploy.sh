@@ -131,6 +131,18 @@ rm -rf "${DEPLOY_ROOT}/opt/PixelCast/signage" \
 
 echo "✓ Files extracted to $INSTALL_DIR"
 
+# ── Sync into the live overlay path ──────────────────────────────────────────
+# Writing to the block device (lower layer) alone is not enough: any existing
+# files in the overlay upper layer will shadow the updates until the next
+# reboot.  Push the same files through the live path so the upper layer is
+# updated in-place and the new version is visible immediately.
+LIVE_DIR="/opt/PixelCast/led-signage"
+if [ "$INSTALL_DIR" != "$LIVE_DIR" ]; then
+    mkdir -p "$LIVE_DIR"
+    rsync -a --delete "$INSTALL_DIR/" "$LIVE_DIR/"
+    echo "✓ Live overlay path synced — upper layer updated in-place"
+fi
+
 # ── Update Nginx config on the SD card ───────────────────────────────────────
 NGINX_SRC="$INSTALL_DIR/deployment/nginx/pixelcast.conf"
 if [ -f "$NGINX_SRC" ]; then
