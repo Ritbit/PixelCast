@@ -48,6 +48,7 @@ from signage.scheduler import Scheduler
 from signage.watchdog import Watchdog
 from signage.alert import AlertManager
 from signage.web.app import create_app
+# Beeper is imported lazily inside main() — only when beeper_gpio is configured
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,6 +62,9 @@ scheduler: Scheduler   = None
 shutdown_event = threading.Event()
 
 
+beeper = None
+
+
 def signal_handler(sig, frame):
     log.info("Shutdown signal received")
     shutdown_event.set()
@@ -68,6 +72,8 @@ def signal_handler(sig, frame):
         scheduler.stop()
     if engine:
         engine.stop()
+    if beeper:
+        beeper.close()
     sys.exit(0)
 
 
@@ -117,7 +123,7 @@ def main():
         media_dir=args.media_dir
     )
 
-    global engine, scheduler
+    global engine, scheduler, beeper
     watchdog: Watchdog = None
     engine = MatrixEngine(config_path=args.config, playlist=playlist)
 
@@ -134,8 +140,17 @@ def main():
     watchdog = Watchdog(engine, timeout_s=watchdog_timeout)
     watchdog.start()
 
+    # Beeper — active buzzer on configurable GPIO pin (optional)
+    beeper = None
+    if engine.cfg.get('beeper_gpio'):
+        try:
+            from signage.beeper import Beeper
+            beeper = Beeper(int(engine.cfg['beeper_gpio']))
+        except Exception as exc:
+            log.warning(f"Beeper init failed (continuing without): {exc}")
+
     # Alert manager — high-priority overlay
-    alert_mgr = AlertManager(engine)
+    alert_mgr = AlertManager(engine, beeper=beeper)
     engine.set_alert_manager(alert_mgr)
 
     if not args.no_web:

@@ -46,14 +46,18 @@ class AlertManager:
     Uses TextRenderer for rendering with full text feature support.
     """
     
-    def __init__(self, engine):
+    def __init__(self, engine, beeper=None):
         """
         Initialize alert manager.
         
         Args:
-            engine (MatrixEngine): Reference to matrix engine for display dimensions
+            engine  (MatrixEngine): Reference to matrix engine for display dimensions
+            beeper  (Beeper|None):  Optional active-buzzer driver.  When set,
+                                    show() fires the pattern from cfg['beep']
+                                    (or 'triple' if cfg['urgent']=True).
         """
         self._engine   = engine
+        self._beeper   = beeper
         self._lock     = threading.Lock()
         self._active   = False
         self._cfg      = {}
@@ -84,14 +88,24 @@ class AlertManager:
             self._expires  = time.time() + duration
             self._active   = True
             self._renderer = None   # force rebuild on next get_frame
+            expires_at     = self._expires
         log.info(f"Alert shown ({duration}s): "
                  f"{[l.get('text','') for l in cfg.get('lines',[])[:2]]}")
+
+        if self._beeper is not None:
+            pattern = cfg.get('beep')
+            if pattern is None and cfg.get('urgent', False):
+                pattern = 'triple'
+            if pattern:
+                self._beeper.beep(pattern, until=expires_at)
 
     def clear(self):
         """Clear the active alert immediately."""
         with self._lock:
             self._active   = False
             self._renderer = None
+        if self._beeper is not None:
+            self._beeper.stop()
         log.info("Alert cleared")
 
     def is_active(self) -> bool:

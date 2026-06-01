@@ -1499,6 +1499,39 @@ def perf():
 
 
 # ---------------------------------------------------------------------------
+# Beeper test
+# ---------------------------------------------------------------------------
+
+@system_bp.route('/beep', methods=['POST'])
+@login_required
+@require_admin
+def beep_test():
+    """
+    Fire a single beep pattern for wiring verification.
+
+    Body (JSON, all optional):
+      pattern : 'short' | 'long' | 'triple' | 'alert'  (default: 'triple')
+
+    Returns 404 if no beeper is configured (beeper_gpio not set in panel.json).
+    """
+    alert_mgr = current_app.config.get('ALERT_MANAGER')
+    beeper = getattr(alert_mgr, '_beeper', None) if alert_mgr else None
+    if beeper is None:
+        return jsonify({'error': 'No beeper configured — set beeper_gpio in panel.json'}), 404
+
+    data    = request.get_json(silent=True) or {}
+    pattern = data.get('pattern', 'triple')
+
+    from signage.beeper import _PATTERNS
+    if pattern not in _PATTERNS:
+        return jsonify({'error': f"Unknown pattern '{pattern}'",
+                        'valid': list(_PATTERNS.keys())}), 400
+
+    beeper.beep(pattern)
+    return jsonify({'ok': True, 'pattern': pattern, 'gpio': beeper.gpio_pin})
+
+
+# ---------------------------------------------------------------------------
 # Config backup & restore
 # ---------------------------------------------------------------------------
 @system_bp.route('/backup')
