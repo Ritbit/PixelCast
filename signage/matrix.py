@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/matrix.py                                               ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Core matrix engine - manages the display loop, renderer         ║
 ║              lifecycle, transitions, frame caching, and alert overlays.      ║

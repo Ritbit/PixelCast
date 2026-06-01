@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/beeper.py                                               ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Active-buzzer driver for GPIO-based attention beeps.            ║
 ║              GPIO pin is configurable via panel.json (beeper_gpio).          ║

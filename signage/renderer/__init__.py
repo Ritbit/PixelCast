@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/__init__.py                                    ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Renderer factory - creates appropriate renderer instances based ║
 ║              on playlist item type. Supports: image, gif, video, clock,      ║

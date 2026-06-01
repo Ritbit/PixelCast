@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/video.py                                       ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: Video renderer using PyAV - supports MP4, AVI, MOV with        ║
 ║              multiple scaling modes, loop modes (restart/pingpong), start    ║

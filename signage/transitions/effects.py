@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/transitions/effects.py                                  ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: 22 transition effects - fade, wipe, slide, zoom, dissolve,      ║
 ║              melt, snow, spiral, drop, blinds, checkerboard, pixelate, etc.  ║

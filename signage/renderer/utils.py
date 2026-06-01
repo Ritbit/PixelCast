@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/utils.py                                       ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Shared rendering utilities - background loading with caching,   ║
 ║              image positioning, scaling, color parsing, and Ken Burns effect.║

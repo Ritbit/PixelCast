@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/web/__init__.py                                         ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Web package initialization.                                     ║
 ╚══════════════════════════════════════════════════════════════════════════════╝

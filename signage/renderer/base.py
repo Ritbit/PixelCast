@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/base.py                                        ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Abstract base renderer class - defines the renderer contract    ║
 ║              that all content renderers must implement. Provides first_frame,║

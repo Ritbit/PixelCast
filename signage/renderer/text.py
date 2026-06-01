@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                          ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/renderer/text.py                                        ║
-║ Version:     1.3.0                                                           ║
+║ Version:     1.3.1                                                           ║
 ║ Author:      Bas                                                             ║
 ║ Description: Multi-line text renderer with inline styling, scrolling (left, ║
 ║              right, up, down), word wrapping, custom fonts, and pixel-perfect║
