@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% block title %}Settings — LED Signage{% endblock %}
+{% block title %}Settings — PixelCast{% endblock %}
 
 {% block head %}
 <style>
@@ -12,6 +12,16 @@
   color: #f0c060; padding: 10px 14px; border-radius: 6px;
   font-size: 12px; margin-bottom: 16px;
 }
+.grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.section-hdr {
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin: 12px 0 10px;
+}
 </style>
 {% endblock %}
 
@@ -19,34 +29,327 @@
 <h1 class="page-title">Settings</h1>
 
 <!-- ================================================================ -->
-<!-- Panel / Hardware Configuration                                    -->
+<!-- 1. System Controls                                                -->
 <!-- ================================================================ -->
 <div class="card">
-  <div class="card-title">Hardware Configuration (panel.json)</div>
-  <div class="restart-warning">
-    ⚠️ Most hardware settings require a daemon restart to take effect.
-    Brightness is applied immediately. After saving, run:
-    <code>sudo systemctl restart led-signage</code>
+  <div class="card-title">System Controls</div>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+    <button class="btn btn-primary"
+            onclick="sysAction('/control/restart_daemon',
+              'Restart the signage daemon?\nThe display will go dark for a few seconds.')">
+      🔄 Restart Daemon
+    </button>
+    <button class="btn btn-secondary"
+            onclick="sysAction('/control/reboot',
+              'Reboot the Raspberry Pi?\nThe display will be unavailable for ~30 seconds.')">
+      ↩ Reboot Pi
+    </button>
+    <button class="btn btn-danger"
+            onclick="sysAction('/control/poweroff',
+              'Shut down the Raspberry Pi?\nYou will need physical access to turn it back on.')">
+      ⏻ Power Off Pi
+    </button>
+    <span style="font-size:12px; color:var(--muted);">
+      Daemon restart applies new hardware settings without a full reboot.
+    </span>
   </div>
+  <div id="sys-msg" style="margin-top:10px; font-size:13px; display:none;"></div>
+</div>
 
+<!-- ================================================================ -->
+<!-- 2. Users & Security                                               -->
+<!-- ================================================================ -->
+<div class="card">
+  <div class="card-title">Users &amp; Security</div>
+
+  {% if current_user.role == 'admin' %}
+  <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px;">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border); text-align:left;">
+        <th style="padding:6px 8px; color:var(--muted); font-weight:600;">Username</th>
+        <th style="padding:6px 8px; color:var(--muted); font-weight:600;">Role</th>
+        <th style="padding:6px 8px; color:var(--muted); font-weight:600;">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for username, udata in users.items() %}
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:8px;">
+          <strong>{{ username }}</strong>
+          {% if username == current_user.id %}
+          <span style="font-size:10px; margin-left:6px; background:var(--accent);
+                       color:#fff; padding:1px 6px; border-radius:8px;">you</span>
+          {% endif %}
+        </td>
+        <td style="padding:8px;">
+          <form method="post" style="display:inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="change_role">
+            <input type="hidden" name="target_user" value="{{ username }}">
+            <select name="new_role" onchange="this.form.submit()"
+                    {% if username == current_user.id %}disabled title="Cannot change your own role"{% endif %}>
+              {% for r in ['viewer','editor','admin'] %}
+              <option value="{{ r }}" {{ 'selected' if udata.get('role','viewer')==r }}>{{ r }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+        <td style="padding:8px;">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-sm btn-secondary"
+                    onclick="showResetPw('{{ username }}')">🔑 Reset PW</button>
+            {% if username != current_user.id %}
+            <form method="post" onsubmit="return confirmUserDelete(this)"
+                  data-username="{{ username | e }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="action" value="delete_user">
+              <input type="hidden" name="target_user" value="{{ username | e }}">
+              <button class="btn btn-sm btn-danger" type="submit">✕ Delete</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      <tr id="reset-pw-{{ username }}" style="display:none; background:var(--surface);">
+        <td colspan="3" style="padding:10px 8px;">
+          <form method="post" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="action" value="reset_password">
+            <input type="hidden" name="target_user" value="{{ username }}">
+            <input type="password" name="new_password" placeholder="New password"
+                   style="flex:1; min-width:160px;" required>
+            <button class="btn btn-sm btn-secondary" type="submit">Set Password</button>
+            <button type="button" class="btn btn-sm btn-secondary"
+                    onclick="document.getElementById('reset-pw-{{ username }}').style.display='none'">
+              Cancel
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="section-hdr">Add User</div>
+  <form method="post"
+        style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="add_user">
+    <div class="form-group" style="margin:0; flex:1; min-width:130px;">
+      <label>Username</label>
+      <input type="text" name="new_username" required placeholder="username" autocomplete="off">
+    </div>
+    <div class="form-group" style="margin:0; flex:1; min-width:130px;">
+      <label>Password</label>
+      <input type="password" name="new_password" required placeholder="password"
+             autocomplete="new-password">
+    </div>
+    <div class="form-group" style="margin:0; min-width:110px;">
+      <label>Role</label>
+      <select name="new_role">
+        <option value="viewer">Viewer</option>
+        <option value="editor">Editor</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <button class="btn btn-secondary" type="submit">＋ Add User</button>
+  </form>
+  <hr style="margin-bottom:16px;">
+  {% endif %}
+
+  <div class="section-hdr">Change Password</div>
   <form method="post">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="action" value="save_panel">
+    <input type="hidden" name="action" value="change_password">
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr auto;
+                gap:12px; align-items:flex-end;">
+      <div class="form-group" style="margin:0;">
+        <label>Current Password</label>
+        <input type="password" name="old_password" required>
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>New Password</label>
+        <input type="password" name="new_password" required minlength="4">
+      </div>
+      <div class="form-group" style="margin:0;">
+        <label>Confirm New Password</label>
+        <input type="password" name="confirm_password" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="white-space:nowrap;">
+        Change Password
+      </button>
+    </div>
+  </form>
+</div>
 
-    <!-- ---- Output type ---- -->
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin-bottom:10px;">Output Type</div>
+<!-- ================================================================ -->
+<!-- 3. REST API                                                       -->
+<!-- ================================================================ -->
+<div class="card">
+  <div class="card-title">REST API</div>
+  <div style="display:flex; align-items:flex-start; gap:16px; flex-wrap:wrap;">
+    <div style="flex:1; min-width:280px;">
+      <label style="font-size:12px; color:var(--muted);">API Key</label>
+      <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+        <input type="text" id="api-key-display" value="{{ api_key }}"
+               readonly style="font-family:monospace; font-size:12px; flex:1;">
+        <button class="btn btn-sm btn-secondary"
+                onclick="navigator.clipboard.writeText(document.getElementById('api-key-display').value);
+                         this.textContent='✓ Copied!'">
+          📋 Copy
+        </button>
+      </div>
+      <p style="font-size:11px; color:var(--muted); margin-top:6px;">
+        Use as <code>Authorization: Bearer &lt;key&gt;</code> header or
+        <code>?api_key=&lt;key&gt;</code> query parameter.
+      </p>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:8px; padding-top:18px;">
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="action" value="regenerate_api_key">
+        <button class="btn btn-sm btn-secondary"
+                onclick="return confirm('Regenerate API key? All existing integrations must be updated.')">
+          🔄 Regenerate
+        </button>
+      </form>
+      <a class="btn btn-sm btn-secondary"
+         href="https://github.com/ritbit/pixelcast#rest-api"
+         target="_blank" rel="noopener">📖 API Docs &amp; Examples</a>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- 4. Backup & Restore                                               -->
+<!-- ================================================================ -->
+<div class="card">
+  <div class="card-title">Backup &amp; Restore</div>
+  <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
+    <div>
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Backup</div>
+      <a class="btn btn-secondary" href="{{ url_for('system.backup') }}">⬇ Download Backup</a>
+      <p style="font-size:11px; color:var(--muted); margin-top:6px;">
+        Downloads a zip of config/ + media/ (excl. transcoded versions).
+      </p>
+    </div>
+    <div style="flex:1; min-width:280px;">
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Restore</div>
+      <form method="post" action="{{ url_for('system.restore') }}"
+            enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input type="file" name="backup_file" accept=".zip"
+                 style="flex:1; background:var(--surface); border:1px solid var(--border);
+                        color:var(--text); padding:6px 10px; border-radius:6px;
+                        font-size:13px;">
+          <button type="submit" class="btn btn-primary btn-sm"
+                  onclick="return confirm('Restore backup? This will overwrite config and media, then restart the daemon.')">
+            ⬆ Restore
+          </button>
+        </div>
+        <p style="font-size:11px; color:var(--muted); margin-top:6px;">
+          Daemon restarts automatically after restore.
+        </p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================ -->
+<!-- 5 + 6 + 7 — single panel-config form (Advanced, Beeper, HW)     -->
+<!-- ================================================================ -->
+<form method="post" id="panel-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="save_panel">
+
+  <!-- ================================================================ -->
+  <!-- 5. Advanced                                                       -->
+  <!-- ================================================================ -->
+  <div class="card">
+    <div class="card-title">Advanced</div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Pixel mapper</label>
+        <input type="text" name="pixel_mapper"
+               value="{{ panel_cfg.get('pixel_mapper','') }}"
+               placeholder="e.g. U-mapper;Rotate:90">
+        <div class="setting-desc">
+          Semicolon-separated list. Options: U-mapper, Rotate:N, Mirror:H/V
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Beeper GPIO pin (BCM)</label>
+        <input type="number" name="beeper_gpio"
+               value="{{ panel_cfg.get('beeper_gpio', 0) }}"
+               min="0" max="27" placeholder="0 = disabled">
+        <div class="setting-desc">
+          Active buzzer on BCM GPIO pin. <strong>0 = disabled.</strong><br>
+          Recommended free pins: 16 or 26. Requires restart.
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; gap:24px; flex-wrap:wrap; margin-top:4px;">
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
+        <input type="checkbox" name="disable_hardware_pulsing" value="1"
+               {{ 'checked' if panel_cfg.get('disable_hardware_pulsing') }}
+               style="width:auto;">
+        Disable hardware pulsing
+        <span class="setting-desc" style="margin:0;">(needed if audio module conflicts)</span>
+      </label>
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:13px;">
+        <input type="checkbox" name="show_refresh_rate" value="1"
+               {{ 'checked' if panel_cfg.get('show_refresh_rate') }}
+               style="width:auto;">
+        Show refresh rate in log
+      </label>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- 6. Beeper Test                                                    -->
+  <!-- ================================================================ -->
+  <div class="card">
+    <div class="card-title">Beeper Test</div>
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <select id="beep-pattern"
+              style="width:auto; padding:6px 10px; border:1px solid var(--border);
+                     background:var(--surface2,#1a1e2e); color:inherit; border-radius:4px;">
+        <option value="triple">triple — 3 × 0.5 s</option>
+        <option value="short">short — 0.5 s</option>
+        <option value="long">long — 1.0 s</option>
+        <option value="alert">alert — continuous 1 s on/off</option>
+      </select>
+      <button type="button" class="btn btn-secondary" onclick="testBeep()">🔔 Test Beep</button>
+      <button type="button" class="btn btn-danger" id="beep-stop-btn"
+              onclick="stopBeep()" style="display:none;">Stop</button>
+      <span id="beep-status" style="font-size:12px; color:var(--muted);"></span>
+    </div>
+  </div>
+
+  <!-- ================================================================ -->
+  <!-- 7. Hardware Configuration                                         -->
+  <!-- ================================================================ -->
+  <div class="card">
+    <div class="card-title">Hardware Configuration</div>
+    <div class="restart-warning">
+      ⚠️ Most hardware settings require a daemon restart to take effect.
+      Brightness is applied immediately. After saving, run:
+      <code>sudo systemctl restart PixelCast</code>
+    </div>
+
+    <!-- Output Type -->
+    <div class="section-hdr">Output Type</div>
     <div class="grid-2" style="margin-bottom:16px;">
       <div class="form-group">
         <label>Output backend</label>
         <select name="output_type" id="output-type-select"
                 onchange="toggleOutputSections(this.value)">
           {% set ot = panel_cfg.get('output_type','gpio') %}
-          <option value="gpio"        {{ 'selected' if ot=='gpio' }}>
+          <option value="gpio"       {{ 'selected' if ot=='gpio' }}>
             GPIO HAT (rpi-rgb-led-matrix)
           </option>
-          <option value="colorlight"  {{ 'selected' if ot=='colorlight' }}>
+          <option value="colorlight" {{ 'selected' if ot=='colorlight' }}>
             ColorLight 5A-75B (Ethernet receiver card)
           </option>
         </select>
@@ -57,13 +360,66 @@
       </div>
     </div>
 
-    <!-- ---- ColorLight settings (shown only when output_type=colorlight) ---- -->
+    <!-- Board / HAT Selection -->
+    <div id="gpio-section"
+         style="display:{{ 'none' if panel_cfg.get('output_type')=='colorlight' else 'block' }};">
+      <div class="section-hdr">Board / HAT Selection</div>
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="form-group">
+          <label>Board type</label>
+          <select name="board_type" id="board-type-select"
+                  onchange="applyBoardPreset(this.value)">
+            {% set bt = panel_cfg.get('board_type','electrodragon-rpi4') %}
+            <option value="electrodragon-rpi4"
+                    {{ 'selected' if bt=='electrodragon-rpi4' }}>
+              ElectroDragon MPC1073 — Raspberry Pi 3/4
+            </option>
+            <option value="electrodragon-rpi5"
+                    {{ 'selected' if bt=='electrodragon-rpi5' }}>
+              ElectroDragon MPC1073 — Raspberry Pi 5 (experimental)
+            </option>
+            <option value="adafruit-triple-rpi4"
+                    {{ 'selected' if bt=='adafruit-triple-rpi4' }}>
+              Adafruit Triple Bonnet #6358 — Raspberry Pi 3/4
+            </option>
+            <option value="adafruit-triple-rpi5"
+                    {{ 'selected' if bt=='adafruit-triple-rpi5' }}>
+              Adafruit Triple Bonnet #6358 — Raspberry Pi 5 ✓ Recommended
+            </option>
+          </select>
+          <div class="setting-desc">
+            Selects GPIO mapping &amp; slowdown defaults.
+            Individual fields can still be fine-tuned.
+          </div>
+        </div>
+        <div class="form-group">
+          <label style="visibility:hidden">Info</label>
+          <div id="board-preset-note"
+               style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
+                      border-radius:6px; padding:10px 12px; font-size:12px;
+                      color:var(--muted); line-height:1.6;">
+            {{ {
+              'electrodragon-rpi4':
+                'Uses BCM GPIO direct access. Parallel max: 2. Not recommended on Pi 5.',
+              'electrodragon-rpi5':
+                'Pi 5 RP1 GPIO — marginal support. Prefer the Adafruit bonnet for Pi 5.',
+              'adafruit-triple-rpi4':
+                'PWM-based driving via adafruit-hat-pwm mapping. Parallel max: 3.',
+              'adafruit-triple-rpi5':
+                'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.'
+            }.get(panel_cfg.get('board_type','electrodragon-rpi4'),
+                  'Select a board type above.') }}
+          </div>
+        </div>
+      </div>
+      <hr style="margin-bottom:16px;">
+    </div>
+
+    <!-- ColorLight 5A-75B Settings (4 columns) -->
     <div id="colorlight-section"
          style="display:{{ 'block' if panel_cfg.get('output_type')=='colorlight' else 'none' }};">
-      <div style="font-size:12px; font-weight:600; color:var(--muted);
-                  text-transform:uppercase; letter-spacing:.05em;
-                  margin-bottom:10px;">ColorLight 5A-75B Settings</div>
-      <div class="grid-3" style="margin-bottom:16px;">
+      <div class="section-hdr">ColorLight 5A-75B Settings</div>
+      <div class="grid-4" style="margin-bottom:12px;">
         <div class="form-group">
           <label>Card IP address</label>
           <input type="text" name="colorlight_ip"
@@ -80,182 +436,151 @@
         </div>
         <div class="form-group">
           <label>Scan lines</label>
-          <input type="number" name="colorlight_scan_lines"
-                 value="{{ panel_cfg.get('colorlight_scan_lines', panel_cfg.get('rows',64)//2) }}"
-                 min="1" max="64">
-          <div class="setting-desc">
-            rows ÷ 2  for 1/32 scan (32 for 64-row panels)
-          </div>
+          <select name="colorlight_scan_lines">
+            {% set cl_scan = panel_cfg.get('colorlight_scan_lines', panel_cfg.get('rows',64)//2) %}
+            {% for v in [16, 32, 64] %}
+            <option value="{{ v }}" {{ 'selected' if cl_scan==v }}>{{ v }}</option>
+            {% endfor %}
+          </select>
+          <div class="setting-desc">rows ÷ 2 for 1/32 scan (32 for 64-row panels)</div>
         </div>
         <div class="form-group">
           <label>HUB75 ports used</label>
-          <input type="number" name="colorlight_ports"
-                 value="{{ panel_cfg.get('colorlight_ports',2) }}"
-                 min="1" max="8">
-          <div class="setting-desc">
-            Number of card output ports wired to panels.
-            Each port drives an equal horizontal strip.
-          </div>
+          <select name="colorlight_ports">
+            {% set cl_ports = panel_cfg.get('colorlight_ports', 2) %}
+            {% for v in range(1, 17) %}
+            <option value="{{ v }}" {{ 'selected' if cl_ports==v }}>{{ v }}</option>
+            {% endfor %}
+          </select>
+          <div class="setting-desc">Card output ports wired to panels.</div>
         </div>
       </div>
       <div style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
                   border-radius:6px; padding:10px 12px; font-size:12px;
                   color:var(--muted); line-height:1.6; margin-bottom:12px;">
         ℹ️ Connect the 5A-75B directly to the Pi's Ethernet port (or a dedicated switch).
-        Assign both devices a static IP on the same subnet — e.g. Pi: 192.168.0.1,
-        card: 192.168.0.20.  The daemon sends the full configuration automatically
-        on startup.  Use <strong>Configure Card Now</strong> to re-send it without restarting.
+        Assign both devices a static IP on the same subnet —
+        e.g. Pi: 192.168.0.1, card: 192.168.0.20.
+        The daemon sends the full configuration automatically on startup.
       </div>
-      <button type="button" id="cl-configure-btn"
-              onclick="configureColorlight()"
+      <button type="button" id="cl-configure-btn" onclick="configureColorlight()"
               style="margin-bottom:16px; padding:8px 18px;
-                     background:var(--accent,#4f8ef7); color:#fff;
-                     border:none; border-radius:6px; cursor:pointer; font-size:13px;">
+                     background:var(--accent,#4f8ef7); color:#fff; border:none;
+                     border-radius:6px; cursor:pointer; font-size:13px;">
         ⚡ Configure Card Now
       </button>
       <div id="cl-configure-result" style="font-size:12px; margin-bottom:16px;"></div>
       <hr style="margin-bottom:16px;">
     </div>
 
-    <!-- ---- Board / HAT selection (hidden when colorlight output is selected) ---- -->
-    <div id="gpio-section"
-         style="display:{{ 'none' if panel_cfg.get('output_type')=='colorlight' else 'block' }};">
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin-bottom:10px;">Board / HAT Selection</div>
-    <div class="grid-2" style="margin-bottom:16px;">
-      <div class="form-group">
-        <label>Board type</label>
-        <select name="board_type" id="board-type-select"
-                onchange="applyBoardPreset(this.value)">
-          {% set bt = panel_cfg.get('board_type','electrodragon-rpi4') %}
-          <option value="electrodragon-rpi4"
-            {{ 'selected' if bt=='electrodragon-rpi4' }}>
-            ElectroDragon MPC1073 — Raspberry Pi 3/4
-          </option>
-          <option value="electrodragon-rpi5"
-            {{ 'selected' if bt=='electrodragon-rpi5' }}>
-            ElectroDragon MPC1073 — Raspberry Pi 5 (experimental)
-          </option>
-          <option value="adafruit-triple-rpi4"
-            {{ 'selected' if bt=='adafruit-triple-rpi4' }}>
-            Adafruit Triple Bonnet #6358 — Raspberry Pi 3/4
-          </option>
-          <option value="adafruit-triple-rpi5"
-            {{ 'selected' if bt=='adafruit-triple-rpi5' }}>
-            Adafruit Triple Bonnet #6358 — Raspberry Pi 5 ✓ Recommended
-          </option>
-        </select>
-        <div class="setting-desc">
-          Selects GPIO mapping &amp; slowdown defaults for your hardware.
-          Individual fields below can still be fine-tuned.
-        </div>
-      </div>
-      <div class="form-group">
-        <label style="visibility:hidden">Apply</label>
-        <div id="board-preset-note"
-             style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
-                    border-radius:6px; padding:10px 12px; font-size:12px;
-                    color:var(--muted); line-height:1.6;">
-          {{ {
-            'electrodragon-rpi4':   'Uses BCM GPIO direct access. Parallel max: 2. Not recommended on Pi 5.',
-            'electrodragon-rpi5':   'Pi 5 RP1 GPIO — marginal support. Prefer the Adafruit bonnet for Pi 5.',
-            'adafruit-triple-rpi4': 'PWM-based driving via adafruit-hat-pwm mapping. Parallel max: 3.',
-            'adafruit-triple-rpi5': 'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.'
-          }.get(panel_cfg.get('board_type','electrodragon-rpi4'),
-                'Select a board type above.') }}
-        </div>
-      </div>
-    </div>
-
-    <hr style="margin-bottom:16px;">
-    </div><!-- /#gpio-section -->
-
-    <!-- Display geometry -->
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin-bottom:10px;">Display Geometry</div>
-    <div class="grid-3">
+    <!-- Display Geometry -->
+    <div class="section-hdr">Display Geometry</div>
+    <div class="grid-4" style="margin-bottom:12px;">
       <div class="form-group">
         <label>Rows per panel</label>
-        <input type="number" name="rows" value="{{ panel_cfg.get('rows',64) }}" min="1">
-        <div class="setting-desc">Typically 16, 32, or 64</div>
+        <select name="rows" onchange="updateDisplaySize()">
+          {% for v in [16,32,64,128,256] %}
+          <option value="{{ v }}" {{ 'selected' if panel_cfg.get('rows',64)==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <div class="setting-desc">Panel row count</div>
       </div>
       <div class="form-group">
         <label>Columns per panel</label>
-        <input type="number" name="cols" value="{{ panel_cfg.get('cols',128) }}" min="1">
-        <div class="setting-desc">Typically 32, 64, or 128</div>
+        <select name="cols" onchange="updateDisplaySize()">
+          {% for v in [32,64,128,256,512] %}
+          <option value="{{ v }}" {{ 'selected' if panel_cfg.get('cols',128)==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <div class="setting-desc">Panel column count</div>
       </div>
       <div class="form-group">
         <label>Chain length</label>
-        <input type="number" name="chain" value="{{ panel_cfg.get('chain',2) }}" min="1">
-        <div class="setting-desc">Panels daisy-chained per output</div>
+        <select name="chain" onchange="updateDisplaySize()">
+          {% for v in range(1,17) %}
+          <option value="{{ v }}" {{ 'selected' if panel_cfg.get('chain',2)==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <div class="setting-desc">Panels daisy-chained</div>
       </div>
       <div class="form-group">
         <label>Parallel chains</label>
-        <input type="number" name="parallel" value="{{ panel_cfg.get('parallel',2) }}" min="1" max="3">
-        <div class="setting-desc">1–3 (limited by GPIO count)</div>
-      </div>
-      <div class="form-group">
-        <label>Display width (px)</label>
-        <input type="number" name="display_width" value="{{ panel_cfg.get('display_width',256) }}" min="1">
-        <div class="setting-desc">cols × chain (e.g. 128×2=256)</div>
-      </div>
-      <div class="form-group">
-        <label>Display height (px)</label>
-        <input type="number" name="display_height" value="{{ panel_cfg.get('display_height',128) }}" min="1">
-        <div class="setting-desc">rows × parallel (e.g. 64×2=128)</div>
+        <select name="parallel" id="parallel-select" onchange="updateDisplaySize()">
+          {% for v in range(1,17) %}
+          <option value="{{ v }}" {{ 'selected' if panel_cfg.get('parallel',2)==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <div class="setting-desc">Parallel outputs (max depends on board)</div>
       </div>
     </div>
+    <div style="font-size:13px; margin-bottom:16px;">
+      Display size: <strong id="display-size-label">
+        {{- panel_cfg.get('display_width',
+              panel_cfg.get('cols',128) * panel_cfg.get('chain',2)) -}}
+        &nbsp;×&nbsp;
+        {{- panel_cfg.get('display_height',
+              panel_cfg.get('rows',64) * panel_cfg.get('parallel',2)) -}}
+        &nbsp;px
+      </strong>
+    </div>
+    <input type="hidden" name="display_width" id="display-width-hidden"
+           value="{{ panel_cfg.get('display_width',
+                      panel_cfg.get('cols',128) * panel_cfg.get('chain',2)) }}">
+    <input type="hidden" name="display_height" id="display-height-hidden"
+           value="{{ panel_cfg.get('display_height',
+                      panel_cfg.get('rows',64) * panel_cfg.get('parallel',2)) }}">
 
     <hr>
 
-    <!-- GPIO / timing -->
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin:10px 0;">GPIO & Timing</div>
+    <!-- GPIO & Timing -->
+    <div class="section-hdr">GPIO &amp; Timing</div>
     <div class="grid-3">
       <div class="form-group">
         <label>GPIO mapping</label>
         <select name="gpio_mapping">
-          {% for m in ['regular','adafruit-hat','adafruit-hat-pwm',
-                       'compute-module','classic','classic-pi1'] %}
-          <option value="{{ m }}" {{ 'selected' if panel_cfg.get('gpio_mapping','regular')==m }}>
-            {{ m }}
-          </option>
+          {% for m in ['regular','adafruit-hat','adafruit-hat-pwm','compute-module',
+                       'classic','classic-pi1'] %}
+          <option value="{{ m }}"
+                  {{ 'selected' if panel_cfg.get('gpio_mapping','regular')==m }}>{{ m }}</option>
           {% endfor %}
         </select>
         <div class="setting-desc">
           <code>regular</code> = ElectroDragon MPC1073<br>
-          <code>adafruit-hat</code> / <code>adafruit-hat-pwm</code> = Adafruit HAT
+          <code>adafruit-hat-pwm</code> = Adafruit HAT
         </div>
       </div>
       <div class="form-group">
         <label>GPIO slowdown</label>
         <input type="number" name="slowdown_gpio"
                value="{{ panel_cfg.get('slowdown_gpio',4) }}" min="0" max="8">
-        <div class="setting-desc">
-          RPi4 → 4, RPi3 → 1–2, RPi5 → varies.<br>
-          Too low = garbage display. Too high = dim/slow.
-        </div>
+        <div class="setting-desc">RPi4 → 4, RPi3 → 1–2, RPi5 → varies.</div>
       </div>
       <div class="form-group">
         <label>Scan mode</label>
         <select name="scan_mode">
-          <option value="0" {{ 'selected' if panel_cfg.get('scan_mode',0)==0 }}>0 — Progressive</option>
-          <option value="1" {{ 'selected' if panel_cfg.get('scan_mode',0)==1 }}>1 — Interlaced</option>
+          <option value="0" {{ 'selected' if panel_cfg.get('scan_mode',0)==0 }}>
+            0 — Progressive
+          </option>
+          <option value="1" {{ 'selected' if panel_cfg.get('scan_mode',0)==1 }}>
+            1 — Interlaced
+          </option>
         </select>
         <div class="setting-desc">Almost always 0 (progressive)</div>
       </div>
       <div class="form-group">
         <label>Row address type</label>
         <select name="row_addr_type">
-          <option value="0" {{ 'selected' if panel_cfg.get('row_addr_type',0)==0 }}>0 — Default (ABCDE)</option>
-          <option value="1" {{ 'selected' if panel_cfg.get('row_addr_type',0)==1 }}>1 — AB-addressed</option>
-          <option value="2" {{ 'selected' if panel_cfg.get('row_addr_type',0)==2 }}>2 — Direct row select</option>
-          <option value="3" {{ 'selected' if panel_cfg.get('row_addr_type',0)==3 }}>3 — ABC-addressed</option>
-          <option value="4" {{ 'selected' if panel_cfg.get('row_addr_type',0)==4 }}>4 — ABC Shift+DE</option>
-          <option value="5" {{ 'selected' if panel_cfg.get('row_addr_type',0)==5 }}>5 — ABC Shift (128×64)</option>
+          {% for v, lbl in [
+            (0,'0 — Default (ABCDE)'),
+            (1,'1 — AB-addressed'),
+            (2,'2 — Direct row select'),
+            (3,'3 — ABC-addressed'),
+            (4,'4 — ABC Shift+DE'),
+            (5,'5 — ABC Shift (128×64)')
+          ] %}
+          <option value="{{ v }}"
+                  {{ 'selected' if panel_cfg.get('row_addr_type',0)==v }}>{{ lbl }}</option>
+          {% endfor %}
         </select>
         <div class="setting-desc">For P2.5 128×64 panels try 0 or 5</div>
       </div>
@@ -263,83 +588,66 @@
         <label>Multiplexing</label>
         <select name="multiplexing">
           {% for i, lbl in [
-            (0,'0 — Direct (default)'),
-            (1,'1 — Stripe'),
-            (2,'2 — Checkered'),
-            (3,'3 — Spiral'),
-            (4,'4 — Z-Stripe'),
-            (5,'5 — ZnMirrorZStripe'),
-            (6,'6 — Coreman'),
-            (7,'7 — Kaler2Scan'),
-            (8,'8 — ZStripeUneven'),
-            (9,'9 — P10-128x4-Z'),
-            (10,'10 — QiangLiQ8'),
-            (11,'11 — InversedZStripe')
+            (0,'0 — Direct'),(1,'1 — Stripe'),(2,'2 — Checkered'),
+            (3,'3 — Spiral'),(4,'4 — Z-Stripe'),(5,'5 — ZnMirrorZStripe'),
+            (6,'6 — Coreman'),(7,'7 — Kaler2Scan'),(8,'8 — ZStripeUneven'),
+            (9,'9 — P10-128x4-Z'),(10,'10 — QiangLiQ8'),(11,'11 — InversedZStripe')
           ] %}
-          <option value="{{ i }}" {{ 'selected' if panel_cfg.get('multiplexing',0)==i }}>
-            {{ lbl }}
-          </option>
+          <option value="{{ i }}"
+                  {{ 'selected' if panel_cfg.get('multiplexing',0)==i }}>{{ lbl }}</option>
           {% endfor %}
         </select>
         <div class="setting-desc">Outdoor/unusual panels may need non-zero</div>
       </div>
       <div class="form-group">
-        <label>Limit refresh rate (Hz) — video flicker fix</label>
+        <label>Limit refresh rate (Hz)</label>
         <input type="number" name="limit_refresh"
                value="{{ panel_cfg.get('limit_refresh',0) }}" min="0"
                id="limit-refresh-input">
         <div class="setting-desc">
-          <strong>Leave at 0 for 1/32-scan panels (P2.5 128×64).</strong>
-          These panels need the full refresh rate for correct PWM brightness.
-          Setting this too low causes flicker on ALL content.<br>
-          Only experiment with this if you have a different panel type and
-          see tearing — try values ≥ 4× your video FPS:
-          25fps → <a href="#" onclick="setRefresh(100)">100</a> &nbsp;|&nbsp;
-          30fps → <a href="#" onclick="setRefresh(120)">120</a>.
-          If anything flickers after changing, set back to
-          <a href="#" onclick="setRefresh(0)">0</a>.
+          <strong>Leave at 0 for 1/32-scan panels.</strong>
+          25 fps → <a href="#" onclick="return setRefresh(100)">100</a> &nbsp;|&nbsp;
+          30 fps → <a href="#" onclick="return setRefresh(120)">120</a> &nbsp;|&nbsp;
+          <a href="#" onclick="return setRefresh(0)">reset to 0</a>
         </div>
       </div>
     </div>
 
     <hr>
 
-    <!-- PWM / colour -->
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin:10px 0;">PWM & Colour</div>
+    <!-- PWM & Colour -->
+    <div class="section-hdr">PWM &amp; Colour</div>
     <div class="grid-3">
       <div class="form-group">
         <label>PWM bits</label>
-        <input type="number" name="pwm_bits"
-               value="{{ panel_cfg.get('pwm_bits',7) }}" min="1" max="11">
-        <div class="setting-desc">
-          1–11. Lower = faster refresh + brighter.<br>
-          7 is a good balance for 1/32 scan panels.
-        </div>
+        <select name="pwm_bits">
+          {% for v in range(3, 12) %}
+          <option value="{{ v }}" {{ 'selected' if panel_cfg.get('pwm_bits',7)==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <div class="setting-desc">3–11. 7 is a good balance for 1/32 scan panels.</div>
       </div>
       <div class="form-group">
         <label>PWM LSB nanoseconds</label>
         <input type="number" name="pwm_lsb_nanoseconds"
                value="{{ panel_cfg.get('pwm_lsb_nanoseconds',50) }}" min="50" max="1000">
-        <div class="setting-desc">
-          50–300. Lower = brighter but may flicker.<br>
-          130 is default; 50 works well on Pi4.
-        </div>
+        <div class="setting-desc">50–300. 50 works well on Pi 4.</div>
       </div>
       <div class="form-group">
         <label>PWM dither bits</label>
-        <input type="number" name="pwm_dither_bits"
-               value="{{ panel_cfg.get('pwm_dither_bits',1) }}" min="0" max="2">
-        <div class="setting-desc">0–2. Smooths colour gradients. 1 recommended.</div>
+        <select name="pwm_dither_bits">
+          {% for v in [0, 1, 2] %}
+          <option value="{{ v }}" {{ 'selected' if panel_cfg.get('pwm_dither_bits',0)==v }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <div class="setting-desc">0–2. <strong>0 recommended</strong> (avoids flicker).</div>
       </div>
       <div class="form-group">
         <label>RGB sequence</label>
         <select name="rgb_sequence">
           {% for s in ['RGB','RBG','GRB','GBR','BRG','BGR'] %}
-          <option value="{{ s }}" {{ 'selected' if panel_cfg.get('rgb_sequence','RGB')==s }}>
-            {{ s }}
-          </option>
+          <option value="{{ s }}"
+                  {{ 'selected' if panel_cfg.get('rgb_sequence','RGB')==s }}>{{ s }}</option>
           {% endfor %}
         </select>
         <div class="setting-desc">If colours look wrong, try BGR or GRB</div>
@@ -363,394 +671,20 @@
             FM6127
           </option>
         </select>
-        <div class="setting-desc">
-          Check driver chip on back of panel.<br>
-          Many AliExpress panels use FM6126A.
-        </div>
+        <div class="setting-desc">Check driver chip on back of panel.</div>
       </div>
     </div>
 
-    <hr>
-
-    <!-- Advanced -->
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin:10px 0;">Advanced</div>
-    <div class="grid-2">
-      <div class="form-group">
-        <label>Pixel mapper</label>
-        <input type="text" name="pixel_mapper"
-               value="{{ panel_cfg.get('pixel_mapper','') }}"
-               placeholder="e.g. U-mapper;Rotate:90">
-        <div class="setting-desc">
-          Semicolon-separated list. Options: U-mapper, Rotate:N, Mirror:H/V
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Beeper GPIO pin (BCM)</label>
-        <input type="number" name="beeper_gpio"
-               value="{{ panel_cfg.get('beeper_gpio', 0) }}"
-               min="0" max="27" placeholder="0 = disabled">
-        <div class="setting-desc">
-          Active buzzer on BCM GPIO pin. <strong>0 = disabled.</strong><br>
-          Recommended free pins: 16 or 26 (regular mapping, 2 parallel).
-          Requires restart to take effect.
-        </div>
-      </div>
-      <div class="form-group" style="display:flex; gap:20px; align-items:center; padding-top:18px;">
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="checkbox" name="disable_hardware_pulsing" value="1"
-                 {{ 'checked' if panel_cfg.get('disable_hardware_pulsing') }}
-                 style="width:auto;">
-          Disable hardware pulsing
-          <span class="setting-desc" style="margin:0;">
-            (needed if audio module conflicts)
-          </span>
-        </label>
-        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-          <input type="checkbox" name="show_refresh_rate" value="1"
-                 {{ 'checked' if panel_cfg.get('show_refresh_rate') }}
-                 style="width:auto;">
-          Show refresh rate in log
-        </label>
-      </div>
-    </div>
-
-    <div style="display:flex; gap:8px; margin-top:16px; align-items:center;">
-      <button type="submit" class="btn btn-success">Save Panel Config</button>
-      <span class="text-muted" style="font-size:12px;">
+    <div style="display:flex; gap:8px; margin-top:20px; align-items:center;">
+      <button type="submit" class="btn btn-success">Save Hardware Configuration</button>
+      <span style="font-size:12px; color:var(--muted);">
         Saved to <code>config/panel.json</code> — restart daemon to apply hardware changes
       </span>
     </div>
-  </form>
+  </div><!-- /.card Hardware Configuration -->
 
-  <!-- ── Beeper test ──────────────────────────────────────────────────── -->
-  <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
-    <div style="font-size:12px; font-weight:600; color:var(--muted);
-                text-transform:uppercase; letter-spacing:.05em;
-                margin-bottom:10px;">Beeper Test</div>
-    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-      <select id="beep-pattern" style="width:auto; padding:6px 10px; border:1px solid var(--border); background:var(--surface2,#1a1e2e); color:inherit; border-radius:4px;">
-        <option value="triple">triple — 3 × 0.5 s</option>
-        <option value="short">short — 0.5 s</option>
-        <option value="long">long — 1.0 s</option>
-        <option value="alert">alert — continuous 1 s on/off</option>
-      </select>
-      <button type="button" class="btn btn-secondary" onclick="testBeep()">&#128276; Test Beep</button>
-      <button type="button" class="btn btn-danger" id="beep-stop-btn"
-              onclick="stopBeep()" style="display:none;">Stop</button>
-      <span id="beep-status" style="font-size:12px; color:var(--muted);"></span>
-    </div>
-  </div>
+</form><!-- /#panel-form -->
 
-  <script>
-  (function () {
-    const csrfToken = () =>
-      document.querySelector('[name=csrf_token]')?.value || '';
-
-    window.testBeep = function () {
-      const pattern = document.getElementById('beep-pattern').value;
-      const status  = document.getElementById('beep-status');
-      const stopBtn = document.getElementById('beep-stop-btn');
-      status.textContent = 'Sending\u2026';
-      stopBtn.style.display = 'none';
-      fetch('/system/beep', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-                   'X-CSRFToken': csrfToken() },
-        body: JSON.stringify({ pattern })
-      })
-      .then(r => r.json())
-      .then(d => {
-        if (d.ok) {
-          status.textContent = '\u2713 Beeping on GPIO ' + d.gpio;
-          if (pattern === 'alert') stopBtn.style.display = '';
-          else setTimeout(() => { status.textContent = ''; }, 4000);
-        } else {
-          status.textContent = '\u26a0 ' + (d.error || 'Error');
-        }
-      })
-      .catch(() => { status.textContent = '\u26a0 Request failed'; });
-    };
-
-    window.stopBeep = function () {
-      fetch('/system/beep', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-                   'X-CSRFToken': csrfToken() },
-        body: JSON.stringify({ pattern: 'stop' })
-      });
-      document.getElementById('beep-status').textContent = '';
-      document.getElementById('beep-stop-btn').style.display = 'none';
-    };
-  })();
-  </script>
-
-</div>
-
-<!-- ================================================================ -->
-<!-- User Management (admin only)                                      -->
-<!-- ================================================================ -->
-{% if current_user.role == 'admin' %}
-<div class="card">
-  <div class="card-title">User Management</div>
-
-  <table style="width:100%; border-collapse:collapse; font-size:13px; margin-bottom:16px;">
-    <thead>
-      <tr style="border-bottom:1px solid var(--border); text-align:left;">
-        <th style="padding:6px 8px; color:var(--muted); font-weight:600;">Username</th>
-        <th style="padding:6px 8px; color:var(--muted); font-weight:600;">Role</th>
-        <th style="padding:6px 8px; color:var(--muted); font-weight:600;">Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for username, udata in users.items() %}
-      <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:8px;">
-          <strong>{{ username }}</strong>
-          {% if username == current_user.id %}<span class="badge" style="font-size:10px;margin-left:6px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px;">you</span>{% endif %}
-        </td>
-        <td style="padding:8px;">
-          <form method="post" style="display:inline;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="change_role">
-            <input type="hidden" name="target_user" value="{{ username }}">
-            <select name="new_role" onchange="this.form.submit()"
-                    {% if username == current_user.id %}disabled title="Cannot change your own role"{% endif %}>
-              {% for r in ['viewer','editor','admin'] %}
-              <option value="{{ r }}" {% if udata.get('role','viewer')==r %}selected{% endif %}>{{ r }}</option>
-              {% endfor %}
-            </select>
-          </form>
-        </td>
-        <td style="padding:8px; display:flex; gap:6px; flex-wrap:wrap;">
-          <!-- Reset password -->
-          <button class="btn btn-sm btn-secondary"
-                  onclick="showResetPw('{{ username }}')">🔑 Reset PW</button>
-          <!-- Delete (not self, not last admin) -->
-          {% if username != current_user.id %}
-          <form method="post" onsubmit="return confirmUserDelete(this)" data-username="{{ username | e }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="delete_user">
-            <input type="hidden" name="target_user" value="{{ username | e }}">
-            <button class="btn btn-sm btn-danger" type="submit">✕ Delete</button>
-          </form>
-          {% endif %}
-        </td>
-      </tr>
-      <!-- Reset PW form (hidden by default) -->
-      <tr id="reset-pw-{{ username }}" style="display:none; background:var(--surface);">
-        <td colspan="3" style="padding:10px 8px;">
-          <form method="post" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="action" value="reset_password">
-            <input type="hidden" name="target_user" value="{{ username }}">
-            <input type="password" name="new_password" placeholder="New password"
-                   style="flex:1; min-width:160px;" required>
-            <button class="btn btn-sm btn-secondary" type="submit">Set Password</button>
-            <button type="button" class="btn btn-sm btn-secondary"
-                    onclick="document.getElementById('reset-pw-{{ username }}').style.display='none'">Cancel</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-
-  <!-- Add user -->
-  <div class="section-title">Add User</div>
-  <form method="post" style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <input type="hidden" name="action" value="add_user">
-    <div class="form-group" style="margin:0; flex:1; min-width:130px;">
-      <label>Username</label>
-      <input type="text" name="new_username" required placeholder="username" autocomplete="off">
-    </div>
-    <div class="form-group" style="margin:0; flex:1; min-width:130px;">
-      <label>Password</label>
-      <input type="password" name="new_password" required placeholder="password" autocomplete="new-password">
-    </div>
-    <div class="form-group" style="margin:0; min-width:110px;">
-      <label>Role</label>
-      <select name="new_role">
-        <option value="viewer">Viewer</option>
-        <option value="editor">Editor</option>
-        <option value="admin">Admin</option>
-      </select>
-    </div>
-    <button class="btn btn-secondary" type="submit" style="margin-bottom:0;">＋ Add User</button>
-  </form>
-</div>
-{% endif %}
-
-<!-- ================================================================ -->
-<!-- REST API Key                                                      -->
-<!-- ================================================================ -->
-<div class="card">
-  <div class="card-title">REST API</div>
-  <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-    <div style="flex:1; min-width:280px;">
-      <label style="font-size:12px; color:var(--muted);">API Key</label>
-      <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
-        <input type="text" id="api-key-display" value="{{ api_key }}"
-               readonly style="font-family:monospace;font-size:12px;flex:1;">
-        <button class="btn btn-sm btn-secondary"
-                onclick="navigator.clipboard.writeText(document.getElementById('api-key-display').value);this.textContent='✓ Copied!'">
-          📋 Copy
-        </button>
-      </div>
-      <p class="text-muted" style="font-size:11px;margin-top:6px;">
-        Use as <code>Authorization: Bearer &lt;key&gt;</code> header or <code>?api_key=&lt;key&gt;</code>.
-      </p>
-    </div>
-    <form method="post" style="padding-top:18px;">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="action" value="regenerate_api_key">
-      <button class="btn btn-sm btn-secondary"
-              onclick="return confirm('Regenerate API key? All existing integrations must be updated.')">
-        🔄 Regenerate
-      </button>
-    </form>
-  </div>
-</div>
-
-<!-- ================================================================ -->
-<!-- Backup & Restore                                                  -->
-<!-- ================================================================ -->
-<div class="card">
-  <div class="card-title">Backup &amp; Restore</div>
-  <div style="display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start;">
-
-    <div>
-      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Backup</div>
-      <a class="btn btn-secondary" href="{{ url_for('system.backup') }}">
-        ⬇ Download Backup
-      </a>
-      <p class="text-muted" style="font-size:11px; margin-top:6px;">
-        Downloads a zip of config/ + media/ (excl. transcoded versions).
-      </p>
-    </div>
-
-    <div style="flex:1; min-width:280px;">
-      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Restore</div>
-      <form method="post" action="{{ url_for('system.restore') }}"
-            enctype="multipart/form-data">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <input type="file" name="backup_file" accept=".zip"
-                 style="flex:1; background:var(--surface); border:1px solid var(--border);
-                        color:var(--text); padding:6px 10px; border-radius:6px; font-size:13px;">
-          <button type="submit" class="btn btn-primary btn-sm"
-                  onclick="return confirm('Restore backup? This will overwrite config and media, then restart the daemon.')">
-            ⬆ Restore
-          </button>
-        </div>
-        <p class="text-muted" style="font-size:11px; margin-top:6px;">
-          Daemon restarts automatically after restore.
-        </p>
-      </form>
-    </div>
-
-  </div>
-</div>
-
-<!-- ================================================================ -->
-<!-- System Controls                                                   -->
-<!-- ================================================================ -->
-<div class="card">
-  <div class="card-title">System Controls</div>
-  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
-
-    <button class="btn btn-primary"
-            onclick="sysAction('/control/restart_daemon',
-              'Restart the signage daemon?\nThe display will go dark for a few seconds.')">
-      🔄 Restart Daemon
-    </button>
-
-    <button class="btn btn-secondary"
-            onclick="sysAction('/control/reboot',
-              'Reboot the Raspberry Pi?\nThe display will be unavailable for ~30 seconds.')">
-      ↩ Reboot Pi
-    </button>
-
-    <button class="btn btn-danger"
-            onclick="sysAction('/control/poweroff',
-              'Shut down the Raspberry Pi?\nYou will need physical access to turn it back on.')">
-      ⏻ Power Off Pi
-    </button>
-
-    <span class="text-muted" style="font-size:12px;">
-      Daemon restart applies new hardware settings without a full reboot.
-    </span>
-  </div>
-  <div id="sys-msg" style="margin-top:10px; font-size:13px; display:none;"></div>
-</div>
-
-<!-- ================================================================ -->
-<!-- Account Settings                                                  -->
-<!-- ================================================================ -->
-<div class="grid-2">
-
-  <div class="card">
-    <div class="card-title">Change Password</div>
-    <form method="post">
-      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="action" value="change_password">
-      <div class="form-group">
-        <label>Current Password</label>
-        <input type="password" name="old_password" required>
-      </div>
-      <div class="form-group">
-        <label>New Password</label>
-        <input type="password" name="new_password" required minlength="4">
-      </div>
-      <div class="form-group">
-        <label>Confirm New Password</label>
-        <input type="password" name="confirm_password" required>
-      </div>
-      <button type="submit" class="btn btn-primary">Change Password</button>
-    </form>
-  </div>
-
-  <div class="card">
-    <div class="card-title">Available Transitions</div>
-    <div style="display:flex; flex-wrap:wrap; gap:6px;">
-      {% for name in [
-        'fade','fade_black','wipe_left','wipe_right','wipe_up','wipe_down',
-        'slide_left','slide_right','slide_up','slide_down',
-        'zoom_in','zoom_out','dissolve','melt','snow','spiral',
-        'drop','blinds_h','blinds_v','checkerboard','pixelate','random'
-      ] %}
-      <span class="badge" style="background:var(--card); color:var(--text);
-            border:1px solid var(--border); font-size:11px; padding:3px 8px;">
-        {{ name.replace('_',' ') }}
-      </span>
-      {% endfor %}
-    </div>
-
-    <hr>
-    <div class="card-title" style="margin-top:8px;">System Info</div>
-    <table style="font-size:12px;">
-      <tr>
-        <td style="color:var(--muted); width:160px; padding:4px 12px 4px 0;">Configured resolution</td>
-        <td>{{ panel_cfg.get('display_width',256) }} × {{ panel_cfg.get('display_height',128) }} px</td>
-      </tr>
-      <tr>
-        <td style="color:var(--muted); padding:4px 12px 4px 0;">GPIO mapping</td>
-        <td>{{ panel_cfg.get('gpio_mapping','regular') }}</td>
-      </tr>
-      <tr>
-        <td style="color:var(--muted); padding:4px 12px 4px 0;">Panel type</td>
-        <td>{{ panel_cfg.get('panel_type') or 'Default' }}</td>
-      </tr>
-      <tr>
-        <td style="color:var(--muted); padding:4px 12px 4px 0;">Web UI port</td>
-        <td>5000 (local network)</td>
-      </tr>
-    </table>
-  </div>
-
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -770,6 +704,29 @@ const BOARD_PRESETS = {
   'adafruit-triple-rpi5': { gpio: 'adafruit-hat-pwm', slowdown: 2, parallelMax: 3,
     note: 'Recommended for Raspberry Pi 5. PWM-based, parallel max: 3.' },
 };
+
+function updateParallelOptions(max) {
+  const sel = document.getElementById('parallel-select');
+  const cur = parseInt(sel.value) || 2;
+  sel.innerHTML = '';
+  for (let i = 1; i <= max; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = i;
+    if (i === Math.min(cur, max)) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  updateDisplaySize();
+}
+
+function applyBoardPreset(boardType) {
+  const preset = BOARD_PRESETS[boardType];
+  if (!preset) return;
+  document.querySelector('select[name="gpio_mapping"]').value = preset.gpio;
+  document.querySelector('input[name="slowdown_gpio"]').value  = preset.slowdown;
+  document.getElementById('board-preset-note').textContent    = preset.note;
+  updateParallelOptions(preset.parallelMax);
+}
 
 function configureColorlight() {
   const btn    = document.getElementById('cl-configure-btn');
@@ -799,28 +756,27 @@ function configureColorlight() {
 }
 
 function toggleOutputSections(outputType) {
-  const gpioSection       = document.getElementById('gpio-section');
-  const colorlightSection = document.getElementById('colorlight-section');
-  if (outputType === 'colorlight') {
-    gpioSection.style.display       = 'none';
-    colorlightSection.style.display = 'block';
+  const isColorlight = outputType === 'colorlight';
+  document.getElementById('gpio-section').style.display       = isColorlight ? 'none'  : 'block';
+  document.getElementById('colorlight-section').style.display = isColorlight ? 'block' : 'none';
+  if (isColorlight) {
+    updateParallelOptions(16);
   } else {
-    gpioSection.style.display       = 'block';
-    colorlightSection.style.display = 'none';
+    const bt     = document.getElementById('board-type-select').value;
+    const preset = BOARD_PRESETS[bt];
+    updateParallelOptions(preset ? preset.parallelMax : 3);
   }
 }
 
-function applyBoardPreset(boardType) {
-  const preset = BOARD_PRESETS[boardType];
-  if (!preset) return;
-  document.querySelector('select[name="gpio_mapping"]').value = preset.gpio;
-  document.querySelector('input[name="slowdown_gpio"]').value  = preset.slowdown;
-  const parallelInput = document.querySelector('input[name="parallel"]');
-  if (parseInt(parallelInput.value) > preset.parallelMax) {
-    parallelInput.value = preset.parallelMax;
-  }
-  parallelInput.max = preset.parallelMax;
-  document.getElementById('board-preset-note').textContent = preset.note;
+function updateDisplaySize() {
+  const rows     = parseInt(document.querySelector('select[name="rows"]').value)  || 64;
+  const cols     = parseInt(document.querySelector('select[name="cols"]').value)  || 128;
+  const chain    = parseInt(document.querySelector('select[name="chain"]').value) || 2;
+  const parallel = parseInt(document.getElementById('parallel-select').value)     || 2;
+  const w = cols * chain, h = rows * parallel;
+  document.getElementById('display-size-label').textContent  = w + ' × ' + h + ' px';
+  document.getElementById('display-width-hidden').value      = w;
+  document.getElementById('display-height-hidden').value     = h;
 }
 
 const csrfToken = '{{ csrf_token() }}';
@@ -831,34 +787,76 @@ function sysAction(url, confirmMsg) {
   msg.style.display = '';
   msg.style.color   = 'var(--muted)';
   msg.textContent   = 'Sending command...';
-
-  fetch(url, {
-    method: 'POST',
-    headers: {'X-CSRFToken': csrfToken}
-  })
+  fetch(url, { method: 'POST', headers: {'X-CSRFToken': csrfToken} })
     .then(r => r.json())
     .then(data => {
       msg.textContent = data.message || 'Done.';
       msg.style.color = data.ok ? 'var(--green)' : 'var(--red)';
     })
-    .catch(err => {
-      // If daemon restarts, fetch will fail — that's expected
+    .catch(() => {
       msg.textContent = 'Command sent. Connection may drop briefly.';
       msg.style.color = 'var(--accent2)';
     });
 }
 
 function confirmUserDelete(form) {
-  const name = form.dataset.username;
-  const msg = document.createElement('span');
-  msg.textContent = name;
-  return confirm('Delete user ' + msg.textContent + '?');
+  return confirm('Delete user ' + form.dataset.username + '?');
 }
-</script>
-<script>
+
 function showResetPw(u) {
-  document.querySelectorAll('[id^="reset-pw-"]').forEach(el => el.style.display="none");
-  document.getElementById("reset-pw-"+u).style.display = "";
+  document.querySelectorAll('[id^="reset-pw-"]').forEach(el => el.style.display = 'none');
+  document.getElementById('reset-pw-' + u).style.display = '';
 }
+
+// Beeper test
+(function () {
+  const csrfTok = () => document.querySelector('[name=csrf_token]')?.value || '';
+
+  window.testBeep = function () {
+    const pattern = document.getElementById('beep-pattern').value;
+    const status  = document.getElementById('beep-status');
+    const stopBtn = document.getElementById('beep-stop-btn');
+    status.textContent = 'Sending\u2026';
+    stopBtn.style.display = 'none';
+    fetch('/system/beep', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfTok()},
+      body: JSON.stringify({ pattern })
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        status.textContent = '\u2713 Beeping on GPIO ' + d.gpio;
+        if (pattern === 'alert') stopBtn.style.display = '';
+        else setTimeout(() => { status.textContent = ''; }, 4000);
+      } else {
+        status.textContent = '\u26a0 ' + (d.error || 'Error');
+      }
+    })
+    .catch(() => { status.textContent = '\u26a0 Request failed'; });
+  };
+
+  window.stopBeep = function () {
+    fetch('/system/beep', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfTok()},
+      body: JSON.stringify({ pattern: 'stop' })
+    });
+    document.getElementById('beep-status').textContent    = '';
+    document.getElementById('beep-stop-btn').style.display = 'none';
+  };
+})();
+
+// Initialise parallel options and display size on page load
+(function () {
+  const ot = document.getElementById('output-type-select').value;
+  if (ot === 'colorlight') {
+    updateParallelOptions(16);
+  } else {
+    const bt     = document.getElementById('board-type-select')?.value;
+    const preset = BOARD_PRESETS[bt];
+    updateParallelOptions(preset ? preset.parallelMax : 3);
+  }
+})();
 </script>
 {% endblock %}
