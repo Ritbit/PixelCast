@@ -277,6 +277,20 @@ else
     fi
 fi
 
+# Blank HUB75 panels during boot so they show nothing instead of random noise
+# while the Pi is starting up. OE (GPIO 18) HIGH disables all panel output;
+# CLK (GPIO 17) and LAT (GPIO 4) LOW stop clocking/latching shift-register data.
+# These GPIO lines are set by the bootloader firmware before the kernel loads,
+# and the rpi-rgb-led-matrix library reconfigures them when PixelCast starts.
+for GPIO_LINE in "gpio=18=op,dh" "gpio=17=op,dl" "gpio=4=op,dl"; do
+    if ! grep -qF "$GPIO_LINE" "$CONFIG_FILE"; then
+        echo "$GPIO_LINE" >> "$CONFIG_FILE"
+        log "$GPIO_LINE added to $CONFIG_FILE"
+    else
+        log "$GPIO_LINE already in $CONFIG_FILE"
+    fi
+done
+
 if ! grep -q 'iomem=relaxed' "$CMDLINE"; then
     sed -i 's/$/ iomem=relaxed/' "$CMDLINE"
     log "iomem=relaxed added to $CMDLINE"
