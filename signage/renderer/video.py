@@ -212,6 +212,7 @@ class VideoRenderer(BaseRenderer):
     def _stream_with_handoff(self):
         for frame in self._single_pass():
             yield frame
+        self._done = True
         if not self._loop:
             while True: yield self._first if self._first is not None else self._black()
             return
