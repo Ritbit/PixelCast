@@ -52,6 +52,31 @@ def register_filters(app):
     def basename_filter(path):
         return os.path.basename(path) if path else ''
 
+    @app.template_filter('fmt_duration')
+    def fmt_duration_filter(value):
+        """Format a duration value for display.
+        Numeric seconds: <90 → 'Xs', <3600 → 'M:SS', else 'H:MM:SS'.
+        Non-numeric strings (e.g. 'auto') are returned as-is.
+        """
+        if value is None:
+            return '—'
+        sv = str(value).strip().lower()
+        if sv in ('auto', ''):
+            return sv if sv else '—'
+        try:
+            secs = int(round(float(sv)))
+        except (ValueError, TypeError):
+            return str(value)
+        if secs < 90:
+            return f"{secs}s"
+        elif secs < 3600:
+            m, s = divmod(secs, 60)
+            return f"{m}:{s:02d}"
+        else:
+            h, rem = divmod(secs, 3600)
+            m, s = divmod(rem, 60)
+            return f"{h}:{m:02d}:{s:02d}"
+
     @app.template_filter('rgb_hex')
     def rgb_hex_filter(color):
         """Convert [r, g, b] list to '#rrggbb' hex string for color inputs."""

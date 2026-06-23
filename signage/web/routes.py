@@ -89,9 +89,24 @@ def brand(filename):
 def index():
     engine   = current_app.config['ENGINE']
     playlist = current_app.config['PLAYLIST']
+    items    = playlist.get_all()
+    # Resolve actual duration for auto-duration video items so the template
+    # can display a real time instead of the literal string 'auto'.
+    for item in items:
+        if str(item.get('duration', '')).strip().lower() == 'auto' \
+                and item.get('type') == 'video':
+            try:
+                import av
+                path = item.get('file', '')
+                if path and os.path.exists(path):
+                    with av.open(path) as c:
+                        if c.duration:
+                            item['_auto_s'] = c.duration / 1_000_000
+            except Exception:
+                pass
     return render_template('index.html',
                            status=engine.get_status(),
-                           playlist=playlist.get_all(),
+                           playlist=items,
                            transitions=sorted(TRANSITION_REGISTRY.keys()))
 
 
@@ -979,6 +994,22 @@ def restart_item():
         n = len(playlist._items)
         if n > 0:
             playlist._index = (playlist._index - 1) % n
+    engine.skip()
+    return jsonify({'ok': True})
+
+
+@control_bp.route('/goto', methods=['POST'])
+@login_required
+def goto():
+    """Jump to a specific playlist item (1-based index from UI)."""
+    ui_index = int(request.json.get('index', 1))
+    playlist = current_app.config['PLAYLIST']
+    engine   = current_app.config['ENGINE']
+    with playlist._lock:
+        n = len(playlist._items)
+        if n > 0:
+            target = max(0, min(ui_index - 1, n - 1))  # clamp, convert to 0-based
+            playlist._index = (target - 1) % n
     engine.skip()
     return jsonify({'ok': True})
 

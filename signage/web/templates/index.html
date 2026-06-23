@@ -253,6 +253,18 @@ canvas.spark {
         ⏻
       </button>
 
+      <!-- Separator -->
+      <div style="width:1px; height:24px; background:var(--border); margin:0 4px;"></div>
+
+      <!-- Go to item -->
+      <input type="number" id="goto-input" min="1"
+             style="width:52px; padding:3px 5px; border:1px solid var(--border);
+                    border-radius:4px; background:var(--surface); color:var(--fg);
+                    font-size:13px; -moz-appearance:textfield;"
+             placeholder="#"
+             onkeydown="if(event.key==='Enter') gotoItem()">
+      <button class="btn btn-sm btn-secondary" onclick="gotoItem()" title="Go to item">Go</button>
+
       <!-- Edit link pushed right -->
       <a href="{{ url_for('playlist.index') }}"
          class="btn btn-sm btn-secondary" style="margin-left:auto;"
@@ -293,7 +305,18 @@ canvas.spark {
           <td>
             <span class="badge badge-{{ item.type }}">{{ item.type }}</span>
           </td>
-          <td style="color:var(--muted);">{{ item.get('duration',10) }}s</td>
+          <td style="color:var(--muted);">
+            {%- set dur = item.get('duration', 10) -%}
+            {%- if dur == 'auto' or dur == 'Auto' -%}
+              {%- if item.get('_auto_s') -%}
+                {{ item._auto_s | fmt_duration }}
+              {%- else -%}
+                auto
+              {%- endif -%}
+            {%- else -%}
+              {{ dur | fmt_duration }}
+            {%- endif -%}
+          </td>
           <td style="font-size:11px; color:var(--muted);">
             {{ item.get('wipe_in','—') }}<br>
             <span style="opacity:.6;">→ {{ item.get('wipe_out','—') }}</span>
@@ -392,6 +415,18 @@ function doControl(url) {
     headers: {'X-CSRFToken': csrfToken}
   }).then(r => r.json()).then(() => {
     if (url.includes('pause')) refreshStatus();
+  });
+}
+
+function gotoItem() {
+  const n = parseInt(document.getElementById('goto-input').value, 10);
+  if (!n || n < 1) return;
+  fetch('/control/goto', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
+    body: JSON.stringify({index: n})
+  }).then(r => r.json()).then(() => {
+    document.getElementById('goto-input').value = '';
   });
 }
 
