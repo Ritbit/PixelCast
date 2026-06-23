@@ -62,8 +62,16 @@ apt-get install -y \
     openssh-server \
     avahi-daemon libnss-mdns \
     overlayroot \
-    linux-image-rt-arm64
+    linux-image-rt-arm64 \
+    chrony
 log "Dependencies installed"
+
+# chrony: replace any existing makestep directive with 'makestep 1 -1'
+# so the clock is stepped immediately on first NTP sync regardless of offset.
+# Pi 4 has no hardware RTC; without this the clock can be weeks off after reboot.
+sed -i '/^makestep /d' /etc/chrony/chrony.conf
+echo 'makestep 1 -1' >> /etc/chrony/chrony.conf
+log "chrony configured (makestep 1 -1)"
 
 # =============================================================================
 step "2. Disable onboard audio (conflicts with matrix PWM timing)"
