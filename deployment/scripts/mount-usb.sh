@@ -18,19 +18,15 @@ if mountpoint -q "$USB_MOUNT"; then
     exit 0
 fi
 
-# 1. Prefer partitions explicitly on a USB transport
+# 1. Find the first partition on any USB-transport disk.
+#    lsblk only sets TRAN=usb on the disk row, not on partition rows, so we
+#    track the USB disk name and then grab its first partition.
 USB_DEV=$(lsblk -rno NAME,TRAN,TYPE 2>/dev/null | awk '
-    $2=="usb" && $3=="part" { print "/dev/"$1; exit }
+    $2=="usb" && $3=="disk" { disk=$1; next }
+    $3=="part" && disk && substr($1,1,length(disk))==disk { print "/dev/"$1; exit }
 ')
 
-# 2. Fall back to whole-disk USB devices (no partition table)
-if [ -z "$USB_DEV" ]; then
-    USB_DEV=$(lsblk -rno NAME,TRAN,TYPE 2>/dev/null | awk '
-        $2=="usb" && $3=="disk" { print "/dev/"$1; exit }
-    ')
-fi
-
-# 3. Last resort: any /dev/sd* partition (not SD card)
+# 2. Last resort: any /dev/sd* partition (not SD card)
 if [ -z "$USB_DEV" ]; then
     USB_DEV=$(lsblk -rno NAME,TYPE 2>/dev/null | \
         awk '$2=="part" { print "/dev/"$1 }' | \
