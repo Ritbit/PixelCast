@@ -284,6 +284,20 @@ else
     log "iomem=relaxed already in $CMDLINE"
 fi
 
+# isolcpus=3 rcu_nocbs=3 nohz_full=3: dedicate CPU 3 to the rpi-rgb-led-matrix
+# refresh thread. The library pins itself to the last CPU (CPU 3 on Pi 4) and
+# sets SCHED_FIFO 99 internally. Without full CPU isolation, rcuc/3 is starved,
+# triggering RCU stalls and the BCM2835 hardware watchdog (1 min timeout).
+# nohz_full=3 stops the timer tick on CPU 3, removing the need for rcuc/3 to run.
+for PARAM in isolcpus=3 rcu_nocbs=3 nohz_full=3; do
+    if ! grep -q "$PARAM" "$CMDLINE"; then
+        sed -i "s/$/ $PARAM/" "$CMDLINE"
+        log "$PARAM added to $CMDLINE"
+    else
+        log "$PARAM already in $CMDLINE"
+    fi
+done
+
 # =============================================================================
 echo ""
 echo "============================================================"
