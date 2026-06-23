@@ -35,6 +35,17 @@ mkdir -p "$INSTALL_DIR" "$MATRIX_DIR" "$SIGNAGE_DIR"
 # =============================================================================
 step "1. System update and dependencies"
 # =============================================================================
+# Pre-configure initramfs before installing packages so postinst hooks work correctly.
+# MODULES=most: mkinitramfs skips root device detection (fails on PARTUUID-based Pi roots).
+# overlay: must be in the initramfs so overlayroot activates on boot with the RT kernel.
+if grep -q '^MODULES=' /etc/initramfs-tools/initramfs.conf 2>/dev/null; then
+    sed -i 's/^MODULES=.*/MODULES=most/' /etc/initramfs-tools/initramfs.conf
+else
+    echo 'MODULES=most' >> /etc/initramfs-tools/initramfs.conf
+fi
+grep -qx 'overlay' /etc/initramfs-tools/modules 2>/dev/null || echo 'overlay' >> /etc/initramfs-tools/modules
+log "initramfs pre-configured (MODULES=most, overlay module)"
+
 apt-get update
 apt-get install -y \
     git build-essential pkg-config cmake \
@@ -50,7 +61,8 @@ apt-get install -y \
     rsync \
     openssh-server \
     avahi-daemon libnss-mdns \
-    overlayroot
+    overlayroot \
+    linux-image-rt-arm64
 log "Dependencies installed"
 
 # =============================================================================
@@ -231,6 +243,40 @@ update-initramfs -u
 log "Initramfs rebuilt — overlay will activate on next reboot"
 
 # =============================================================================
+step "11. RT kernel boot setup"
+# =============================================================================
+# The Debian RT kernel postinst (z50-raspi-firmware) skips Pi firmware setup
+# for non-Pi kernels — copy vmlinuz + initrd manually and point config.txt at them.
+# iomem=relaxed: rpi-rgb-led-matrix mmaps /dev/mem for GPIO register access;
+# the RT kernel has CONFIG_STRICT_DEVMEM enabled which blocks this without it.
+
+RT_KERNEL=$(ls /boot/vmlinuz-*-rt-arm64 2>/dev/null | sort -V | tail -1)
+RT_INITRD=$(ls /boot/initrd.img-*-rt-arm64 2>/dev/null | sort -V | tail -1)
+
+if [ -z "$RT_KERNEL" ] || [ -z "$RT_INITRD" ]; then
+    warn "RT kernel or initrd not found in /boot — skipping firmware copy"
+else
+    RT_NAME=$(basename "$RT_KERNEL" | sed 's/vmlinuz-//')
+    cp "$RT_KERNEL" /boot/firmware/vmlinuz-rt
+    cp "$RT_INITRD" /boot/firmware/initrd.img-rt
+    log "RT kernel copied to /boot/firmware ($RT_NAME)"
+
+    if ! grep -q 'kernel=vmlinuz-rt' "$CONFIG_FILE"; then
+        printf '\n[all]\nkernel=vmlinuz-rt\ninitramfs initrd.img-rt followkernel\n' >> "$CONFIG_FILE"
+        log "RT kernel configured in $CONFIG_FILE"
+    else
+        log "RT kernel already configured in $CONFIG_FILE"
+    fi
+fi
+
+if ! grep -q 'iomem=relaxed' "$CMDLINE"; then
+    sed -i 's/$/ iomem=relaxed/' "$CMDLINE"
+    log "iomem=relaxed added to $CMDLINE"
+else
+    log "iomem=relaxed already in $CMDLINE"
+fi
+
+# =============================================================================
 echo ""
 echo "============================================================"
 echo " Installation complete!"
@@ -257,5 +303,6 @@ echo " an admin account. Please choose a strong password."
 echo ""
 echo " NOTE: Reboot required to activate:"
 echo "        - Audio disable (PWM conflict fix)"
+echo "        - RT kernel (PREEMPT_RT — flicker-free LED display)"
 echo "        - Overlay filesystem (read-only SD card protection)"
 echo "============================================================"
