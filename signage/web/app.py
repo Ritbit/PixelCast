@@ -60,7 +60,6 @@ def create_app(engine, playlist, scheduler, media_dir, users_path, alert_manager
     app.config['SCHEDULER']    = scheduler
     # Store config path so settings route can save panel.json
     # Derive from the panel config path passed to the engine
-    import inspect as _inspect
     app.config['CONFIG_PATH']  = engine.cfg.get('_path', '/media/usb/config/panel.json')
 
     from signage import VERSION as _VERSION

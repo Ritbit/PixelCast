@@ -156,9 +156,9 @@ pixelcast/
 
 ### Dashboard
 - Live MJPEG preview of current display
-- Playback controls (play/pause, skip, previous)
+- Playback controls (play/pause, skip, previous, go-to item)
 - Brightness control
-- System status
+- System status with per-item duration display
 
 ### Playlist Manager
 - Drag-and-drop reordering
@@ -208,7 +208,7 @@ Authentication: `Authorization: Bearer <api_key>` or `?api_key=<key>`
 | POST | `/alert` | Show priority alert |
 | DELETE | `/alert` | Clear alert |
 
-See `CLAUDE_PROJECT_CONTEXT.md` for complete API documentation.
+See `docs/` for detailed documentation.
 
 ---
 
@@ -226,7 +226,7 @@ See `CLAUDE_PROJECT_CONTEXT.md` for complete API documentation.
   "slowdown": 4,
   "pwm_bits": 7,
   "pwm_lsb_nanoseconds": 50,
-  "pwm_dither_bits": 1,
+  "pwm_dither_bits": 0,
   "brightness": 80
 }
 ```
@@ -270,7 +270,7 @@ sudo python3 /opt/PixelCast/led-signage/daemon.py
 ### Watching Logs
 
 ```bash
-journalctl -u led-signage -f
+journalctl -u PixelCast -f
 ```
 
 ### Before Packaging
@@ -295,13 +295,13 @@ journalctl -u led-signage -f
 
 ```bash
 # Check service status
-sudo systemctl status led-signage
+sudo systemctl status PixelCast
 
 # Restart service
-sudo systemctl restart led-signage
+sudo systemctl restart PixelCast
 
 # View logs
-journalctl -u led-signage -n 100
+journalctl -u PixelCast -n 100
 ```
 
 ### Web Interface

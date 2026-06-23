@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
 # PixelCast
@@ -16,7 +17,6 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║ PixelCast - Professional LED Matrix Signage System                           ║

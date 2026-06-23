@@ -163,9 +163,6 @@ fi
 if [ -n "$MOUNTED_TMP" ]; then
     umount "$MOUNTED_TMP"
     echo "  Unmounted $MOUNTED_TMP"
-elif [ -n "$DEPLOY_ROOT" ]; then
-    mount -o remount,ro "$DEPLOY_ROOT"
-    echo "  Remounted $DEPLOY_ROOT read-only"
 fi
 
 # ── Reload Nginx + start service ──────────────────────────────────────────────

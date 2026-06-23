@@ -2,25 +2,25 @@
 
 ## Deployment
 ```bash
-cd /opt/PixelCast && tar -xzf /root/led-signage.tar.gz && sudo systemctl restart led-signage
-journalctl -u led-signage -f
+./deploy.sh          # from repo root — overlay-aware, stops/starts service
+journalctl -u PixelCast -f
 ```
 
-**Important:** The systemd service requires `SIGNAGE_SECRET` environment variable for Flask session security. This is auto-generated during installation, or set manually in `/etc/systemd/system/led-signage.service`.
+**Important:** The systemd service requires `SIGNAGE_SECRET` environment variable for Flask session security. This is auto-generated during installation, or set manually in `/etc/systemd/system/PixelCast.service`.
 
 ## Key Paths
-| What | Path |
-|---|---|
-| Application code | `/opt/PixelCast/led-signage/` |
-| Config files | `/opt/PixelCast/config/` |
-| Media files | `/opt/PixelCast/media/` |
-| Playlist | `/opt/PixelCast/config/playlist.json` |
-| Users + API key | `/opt/PixelCast/config/users.json` |
-| Panel config | `/opt/PixelCast/config/panel.json` |
-| Transcoded video | `/opt/PixelCast/media/*.matrix.mp4` |
-| Thumbnails | `/opt/PixelCast/media/.thumbs/` |
-| Weather icons | `/opt/PixelCast/media/weather-icons/` |
-| Fonts | `/opt/PixelCast/led-signage/fonts/` + system fonts |
+| What             | Path                                               |
+|------------------|----------------------------------------------------|
+| Application code | `/opt/PixelCast/led-signage/`                      |
+| Config files     | `/opt/PixelCast/config/`                           |
+| Media files      | `/opt/PixelCast/media/`                            |
+| Playlist         | `/opt/PixelCast/config/playlist.json`              |
+| Users + API key  | `/opt/PixelCast/config/users.json`                 |
+| Panel config     | `/opt/PixelCast/config/panel.json`                 |
+| Transcoded video | `/opt/PixelCast/media/*.matrix.mp4`                |
+| Thumbnails       | `/opt/PixelCast/media/.thumbs/`                    |
+| Weather icons    | `/opt/PixelCast/media/weather-icons/`              |
+| Fonts            | `/opt/PixelCast/led-signage/fonts/` + system fonts |
 
 **Note:** Config and media are at `/opt/PixelCast` level (persistent), code is in `/opt/PixelCast/led-signage` (replaceable).
 
@@ -106,15 +106,23 @@ Renderer must set `self._done = True` when content complete.
 ```json
 "bg_mode": "color",   "bg_color": [0, 0, 0]
 "bg_mode": "corner",  "bg_corner": "top-left"
-"bg_mode": "image",   "bg_image": "/root/led-signage/media/bg.jpg",
+"bg_mode": "image",   "bg_image": "/opt/PixelCast/media/bg.jpg",
                       "bg_dim": 40
 ```
 
 ## Transitions
 `fade` `fade_black` `wipe_left/right/up/down` `slide_left/right/up/down`
 `zoom_in/out` `dissolve` `melt` `snow` `spiral` `drop`
-`blinds_h/v` `checkerboard` `pixelate` `none`
+`blinds_h/v` `checkerboard` `pixelate` `none` `random`
 Speed: float 0.1–5.0 (higher = faster)
+
+## Jinja2 Filters
+| Filter | Result |
+|--------|--------|
+| `{{ color_list \| rgb_hex }}` | `#rrggbb` string |
+| `{{ path \| basename }}` | filename only |
+| `{{ seconds \| timecode }}` | `mm:ss` string |
+| `{{ secs \| fmt_duration }}` | `Xs` / `M:SS` / `H:MM:SS` |
 
 ## Roles
 ```
@@ -126,7 +134,7 @@ admin   → full including users, hardware settings, reboot
 ## API Quick Reference
 ```bash
 KEY="your-api-key"
-PI="192.168.2.173"
+PI="<pi-ip>"
 H="Authorization: Bearer $KEY"
 
 # Status

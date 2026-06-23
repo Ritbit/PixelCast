@@ -213,7 +213,7 @@ class MatrixEngine:
             "gpio_mapping": "regular", "rows": 64, "cols": 128,
             "chain": 2, "parallel": 2, "slowdown_gpio": 4,
             "pwm_bits": 7, "pwm_lsb_nanoseconds": 50,
-            "pwm_dither_bits": 1, "display_width": 256,
+            "pwm_dither_bits": 0, "display_width": 256,
             "display_height": 128, "brightness": 80
         }
         if os.path.exists(path):
@@ -508,9 +508,7 @@ class MatrixEngine:
                     threading.Thread(target=_prerender, daemon=True,
                                      name='PreRender').start()
 
-            # Peek at next item — lightweight=True skips pre-buffering
-            # since we only need the first frame for the wipe-out transition
-            next_item = self.playlist.peek_next()
+            # Reuse next_item already fetched above for wipe-out peek
             if next_item and self._item_is_active(next_item):
                 try:
                     next_renderer = get_renderer(

@@ -1,6 +1,6 @@
 # PixelCast Project Structure
 
-**Last Updated**: April 28, 2026
+**Last Updated**: June 2026
 
 This document describes the project structure with clean separation between code and data.
 
@@ -35,6 +35,9 @@ pixelcast/
     ├── scheduler.py                # Time-based scheduling
     ├── alert.py                    # Alert overlay system
     ├── watchdog.py                 # Health monitoring
+    ├── beeper.py                   # Active buzzer via configurable GPIO pin
+    ├── overlay.py                  # Persistent clock/text/ticker overlay
+    ├── outputs.py                  # GPIOOutput (HUB75) + UDPOutput backends
     ├── transcoder.py               # Video transcoding
     ├── thumbnailer.py              # Thumbnail generation
     ├── timecode.py                 # Timecode parsing utilities
@@ -44,7 +47,8 @@ pixelcast/
     ├── renderer/                   # Content Renderers
     │   ├── __init__.py             # Renderer factory
     │   ├── base.py                 # Base renderer class
-    │   ├── image.py                # Image/GIF renderer
+    │   ├── image.py                # Static image renderer
+    │   ├── gif.py                  # Animated GIF renderer
     │   ├── video.py                # Video renderer
     │   ├── text.py                 # Text renderer
     │   ├── clock.py                # Clock renderer
