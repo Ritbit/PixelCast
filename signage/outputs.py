@@ -199,11 +199,7 @@ class GPIOOutput(BaseOutput):
         if pixel_mapper:
             options.pixel_mapper_config = pixel_mapper
 
-        # Snapshot threads before init so we can pin the new C++ refresh
-        # thread to the isolated CPU core after construction.
-        tids_before = self._thread_ids()
         self._matrix = RGBMatrix(options=options)
-        self._pin_new_threads(tids_before, cpu=3)
         log.info("GPIOOutput: RGBMatrix hardware initialised")
 
     # ── helpers ───────────────────────────────────────────────────────────────
