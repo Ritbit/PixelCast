@@ -213,7 +213,7 @@ class VideoRenderer(BaseRenderer):
         for frame in self._single_pass():
             yield frame
         if not self._loop:
-            while True: yield self._first or self._black()
+            while True: yield self._first if self._first is not None else self._black()
             return
         while True:
             if self._prebuf_ready.is_set() and self._prebuffered:
@@ -259,11 +259,11 @@ class VideoRenderer(BaseRenderer):
             plays += 1
             self._done = True   # signal one complete play for auto-duration
             if not self._loop:
-                while True: yield self._first or self._black()
+                while True: yield self._first if self._first is not None else self._black()
                 return
             if self._loop_count > 0 and plays >= self._loop_count:
                 # Held on last frame indefinitely after loop limit
-                while True: yield self._first or self._black()
+                while True: yield self._first if self._first is not None else self._black()
                 return
 
     def _play_buffer(self, buf):
