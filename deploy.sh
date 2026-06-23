@@ -76,21 +76,16 @@ done
 
 if [ -n "$OVERLAY_LOWER" ]; then
     # Strategy A: overlay active.
-    # Pi OS calls blockdev --setro on the lower-layer device when activating
-    # the overlay, which causes a plain 'mount -o rw' to silently fall back
-    # to ro.  Call blockdev --setrw first (same as overlayroot-chroot), then
-    # restore --setro after unmounting.
-    ROOT_DEV=$(findmnt --noheadings --output SOURCE "$OVERLAY_LOWER" 2>/dev/null | head -1)
-    if [ -b "$ROOT_DEV" ]; then
-        MOUNTED_TMP="/mnt/root-rw"
-        mkdir -p "$MOUNTED_TMP"
-        blockdev --setrw "$ROOT_DEV"
-        mount -o rw "$ROOT_DEV" "$MOUNTED_TMP"
-        DEPLOY_ROOT="$MOUNTED_TMP"
-        echo "  Overlay mode (Strategy A) — mounted $ROOT_DEV → $MOUNTED_TMP (rw)"
-    else
-        echo "  ⚠ Overlay at $OVERLAY_LOWER but device not found — falling through to Strategy B"
-    fi
+    # The kernel refuses to remount the block device rw while it is in use as
+    # an overlay lower dir.  Instead, bind-mount the already-mounted lower dir
+    # and remount just that bind entry as rw — this changes the per-mount flag
+    # without needing to re-open the block device.
+    MOUNTED_TMP="/mnt/root-rw"
+    mkdir -p "$MOUNTED_TMP"
+    mount --bind "$OVERLAY_LOWER" "$MOUNTED_TMP"
+    mount -o remount,rw "$MOUNTED_TMP"
+    DEPLOY_ROOT="$MOUNTED_TMP"
+    echo "  Overlay mode (Strategy A) — bind-remounted $OVERLAY_LOWER → $MOUNTED_TMP (rw)"
 fi
 
 if [ -z "$DEPLOY_ROOT" ]; then
@@ -106,7 +101,6 @@ if [ -z "$DEPLOY_ROOT" ]; then
     if [ -b "$ROOT_DEV" ]; then
         MOUNTED_TMP="/mnt/root-rw"
         mkdir -p "$MOUNTED_TMP"
-        blockdev --setrw "$ROOT_DEV"
         mount -o rw "$ROOT_DEV" "$MOUNTED_TMP"
         DEPLOY_ROOT="$MOUNTED_TMP"
         echo "  Overlay mode (Strategy B) — mounted $ROOT_DEV → $MOUNTED_TMP (rw)"
@@ -161,11 +155,10 @@ else
     echo "⚠ Nginx config not found — skipping"
 fi
 
-# ── Unmount and restore block-device write-protection ─────────────────────────
+# ── Unmount ──────────────────────────────────────────────────────────────────
 if [ -n "$MOUNTED_TMP" ]; then
     umount "$MOUNTED_TMP"
-    [ -n "$ROOT_DEV" ] && blockdev --setro "$ROOT_DEV"
-    echo "  Unmounted $MOUNTED_TMP, $ROOT_DEV restored to read-only"
+    echo "  Unmounted $MOUNTED_TMP"
 fi
 
 # ── Reload Nginx + start service ──────────────────────────────────────────────
