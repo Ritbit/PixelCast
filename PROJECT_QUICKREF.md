@@ -33,7 +33,12 @@ journalctl -u PixelCast -f
 - Queue `maxsize=1` — stale frames dropped, display always shows latest
 - CPU layout: render→core 1, output→core 2, C++ GPIO refresh→core 3
 - Brightness: 0–100 (stored in panel.json, applied at matrix init)
-- `engine.get_perf_stats()` → `{frames_output, frames_dropped, canvas_mode}` | `GET /system/perf`
+
+## Remote Log Forwarding
+- Auto-discovers a log server on the LAN advertising `_pixelcast-log._tcp` via mDNS — no hostname hardcoded on-device
+- `deployment/scripts/discover-logserver.sh` + `PixelCast-logdiscovery.timer` (runs at boot + every 5min)
+- Status: `GET /system/logs/forward-status` or the indicator on the web UI's Logs page
+- Log server setup: see `deployment/logserver/README.md` (or `install-logserver.sh` for RHEL-based hosts)
 
 ## Adding a New Renderer
 1. Create `signage/renderer/mytype.py` extending `BaseRenderer`

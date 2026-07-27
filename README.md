@@ -104,7 +104,11 @@ pixelcast/
 │   ├── install.sh               # Installation script
 │   ├── README.md                # Deployment guide
 │   ├── systemd/
-│   │   └── led-signage.service  # Systemd service file
+│   │   ├── PixelCast.service              # Main daemon systemd unit
+│   │   └── PixelCast-logdiscovery.service # mDNS log-server discovery (+ .timer)
+│   ├── scripts/
+│   │   └── discover-logserver.sh          # Log-forwarding discovery logic
+│   ├── logserver/                         # Setup for the remote log server side
 │   └── nginx/
 │       └── pixelcast.conf       # Nginx reverse proxy config
 │

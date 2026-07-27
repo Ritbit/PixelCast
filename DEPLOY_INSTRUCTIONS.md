@@ -57,7 +57,7 @@ ssh root@192.168.2.173
 
 ```bash
 # 4. Stop the service
-sudo systemctl stop led-signage
+sudo systemctl stop PixelCast
 
 # 5. Backup current installation (optional but recommended)
 cd /opt/PixelCast/led-signage
@@ -68,19 +68,19 @@ cd /opt/PixelCast
 tar -xzf /root/led-signage.tar.gz
 
 # 7. Update Nginx configuration
-sudo cp /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf /etc/nginx/sites-available/led-signage
+sudo cp /opt/PixelCast/led-signage/deployment/nginx/pixelcast.conf /etc/nginx/sites-available/PixelCast
 sudo nginx -t && sudo systemctl reload nginx
 
 # 8. Update systemd service (if changed)
-sudo cp /opt/PixelCast/led-signage/deployment/systemd/led-signage.service /etc/systemd/system/led-signage.service
+sudo cp /opt/PixelCast/led-signage/deployment/systemd/PixelCast.service /etc/systemd/system/PixelCast.service
 sudo systemctl daemon-reload
 
 # 9. Restart the service
-sudo systemctl start led-signage
+sudo systemctl start PixelCast
 
 # 10. Check status
-sudo systemctl status led-signage
-journalctl -u led-signage -f
+sudo systemctl status PixelCast
+journalctl -u PixelCast -f
 ```
 
 ## What Gets Deployed
@@ -130,10 +130,10 @@ After deployment, verify everything works:
 
 ```bash
 # Check service status
-sudo systemctl status led-signage
+sudo systemctl status PixelCast
 
 # Check logs
-journalctl -u led-signage -f
+journalctl -u PixelCast -f
 
 # Test web interface
 curl -I http://localhost/
@@ -150,7 +150,7 @@ curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost/api/v1/status
 ### Service won't start
 ```bash
 # Check logs for errors
-journalctl -u led-signage -n 50
+journalctl -u PixelCast -n 50
 
 # Verify paths
 ls -la /opt/PixelCast/led-signage/
@@ -175,7 +175,7 @@ If you migrated from an old installation, playlist may have absolute paths. Fix 
 ```bash
 sudo sed -i 's|/root/led-signage/media/|media/|g' /opt/PixelCast/config/playlist.json
 sudo sed -i 's|/opt/PixelCast/led-signage/media/|media/|g' /opt/PixelCast/config/playlist.json
-sudo systemctl restart led-signage
+sudo systemctl restart PixelCast
 ```
 
 ## Rollback
@@ -184,7 +184,7 @@ If a deployment fails, rollback to the previous version:
 
 ```bash
 # Stop service
-sudo systemctl stop led-signage
+sudo systemctl stop PixelCast
 
 # Restore from backup
 cd /opt/PixelCast
@@ -192,5 +192,5 @@ rm -rf led-signage
 tar -xzf led-signage-backup-YYYYMMDD-HHMMSS.tar.gz -C led-signage
 
 # Restart service
-sudo systemctl start led-signage
+sudo systemctl start PixelCast
 ```

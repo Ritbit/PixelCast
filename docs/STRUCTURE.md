@@ -150,8 +150,8 @@ In production (`/opt/PixelCast`), code and data are completely separated:
 ### Deployment
 - **Install**: `sudo bash deployment/install.sh`
 - **Update**: `./deploy.sh` (from development machine)
-- **Service**: `sudo systemctl {start|stop|restart|status} led-signage`
-- **Logs**: `journalctl -u led-signage -f`
+- **Service**: `sudo systemctl {start|stop|restart|status} PixelCast`
+- **Logs**: `journalctl -u PixelCast -f`
 
 ## Benefits
 

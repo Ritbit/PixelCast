@@ -43,8 +43,8 @@
 /opt/PixelCast/led-signage/
 ├── daemon.py                    # Entry point — starts engine + web + scheduler
 ├── install.sh                   # Full redeploy script
-├── led-signage.service          # Systemd unit file
-├── nginx-led-signage.conf       # Nginx reverse proxy config
+├── deployment/systemd/PixelCast.service  # Systemd unit file
+├── deployment/nginx/pixelcast.conf       # Nginx reverse proxy config
 ├── requirements.txt
 ├── fonts/                       # TTF fonts (system fonts also searched)
 ├── config/
@@ -462,7 +462,7 @@ Legacy single-text format also accepted: `{"text": "...", "color": [R,G,B], "dur
 | schedule | POST /schedule/delete_rule/<idx> | editor | Delete rule |
 | system | GET /system/logs | viewer | Log viewer |
 | system | GET /system/stats | viewer | System stats |
-| system | GET /system/perf | viewer | Output-thread perf counters (frames, dropped, canvas mode) |
+| system | GET /system/logs/forward-status | viewer | Remote log-forwarding status (mDNS-discovered) |
 | system | GET /system/backup | viewer | Download backup |
 | system | POST /system/restore | admin | Restore backup |
 
@@ -570,10 +570,10 @@ Always `[R, G, B]` lists (0–255). `parse_color()` in `utils.py` handles lists,
 
 ```bash
 # Deploy on Pi
-cd /opt/PixelCast && tar -xzf led-signage.tar.gz && sudo systemctl restart led-signage
+cd /opt/PixelCast && tar -xzf led-signage.tar.gz && sudo systemctl restart PixelCast
 
 # Watch logs
-journalctl -u led-signage -f
+journalctl -u PixelCast -f
 
 # Manual debug run
 sudo python3 /opt/PixelCast/led-signage/daemon.py

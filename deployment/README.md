@@ -11,11 +11,15 @@ sudo bash deployment/install.sh
 
 ## Directory Structure
 
-```
+```text
 deployment/
 ├── install.sh              # Main installation script
 ├── systemd/
-│   └── led-signage.service # Systemd service unit file
+│   ├── PixelCast.service               # Main daemon systemd unit
+│   └── PixelCast-logdiscovery.service  # mDNS log-server discovery (+ .timer)
+├── scripts/
+│   └── discover-logserver.sh           # Log-forwarding discovery logic
+├── logserver/                          # Setup for the remote log server side
 └── nginx/
     └── pixelcast.conf      # Nginx reverse proxy configuration
 ```
