@@ -5,7 +5,17 @@ and forward all logs to it (rsyslog, TCP). No hostname is hardcoded on the
 device side — any host on the network advertising the right mDNS service
 will be picked up automatically within ~5 minutes (or immediately on boot).
 
-## To make a host receive PixelCast logs
+## Quick start (RHEL/CentOS/Rocky/Fedora)
+
+```bash
+sudo ./install-logserver.sh
+```
+
+Installs and configures everything below in one go — rsyslog receiver,
+firewall rule, Avahi advertisement, and log rotation. Idempotent, safe to
+re-run.
+
+## Manual setup (any distro)
 
 1. **Install and configure rsyslog** to receive remote logs on TCP/UDP 514,
    writing to a per-host directory, e.g.:
