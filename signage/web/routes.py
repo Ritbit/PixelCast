@@ -1054,10 +1054,10 @@ def screentest_stop():
 @control_bp.route('/restart_daemon', methods=['POST'])
 @login_required
 def restart_daemon():
-    """Restart the led-signage systemd service."""
+    """Restart the PixelCast systemd service."""
     import subprocess
     try:
-        subprocess.Popen(['systemctl', 'restart', 'led-signage'])
+        subprocess.Popen(['systemctl', 'restart', 'PixelCast'])
         return jsonify({'ok': True, 'message': 'Daemon restarting...'})
     except Exception as e:
         return jsonify({'ok': False, 'message': str(e)}), 500
@@ -1642,7 +1642,7 @@ def restore():
         flash(f'Restored {restored} files. Restarting daemon to apply config.',
               'success')
         log.info(f"Backup restored: {restored} files")
-        subprocess.Popen(['systemctl', 'restart', 'led-signage'])
+        subprocess.Popen(['systemctl', 'restart', 'PixelCast'])
 
     except Exception as e:
         log.error(f"Restore failed: {e}")
