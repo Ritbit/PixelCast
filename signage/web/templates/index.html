@@ -584,10 +584,12 @@ function fetchPerf() {
   }).catch(()=>{});
 }
 
-fetchStats();
-fetchPerf();
-setInterval(fetchStats, 5000);
-setInterval(fetchPerf, 10000);
+function fetchAll() {
+  fetchStats();
+  fetchPerf();
+}
+fetchAll();
+setInterval(fetchAll, 5000);
 
 // ---- System actions (restart/poweroff) ----
 function sysAction(url, msg) {

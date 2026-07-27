@@ -171,7 +171,7 @@ class _OutputThread(threading.Thread):
         self.frame_count += 1
         self._fps_count  += 1
         now = time.perf_counter()
-        if now - self._t_last_fps >= 10.0:
+        if now - self._t_last_fps >= 5.0:
             fps = self._fps_count / (now - self._t_last_fps)
             self._current_fps = fps
             log.debug(f"OutputThread: {fps:.1f} fps "
