@@ -27,7 +27,7 @@
 
 set -e
 
-SERVER="${1:-172.17.124.195}"
+SERVER="${1:-172.17.124.94}"
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo "=== PixelCast Deployment ==="
@@ -155,6 +155,16 @@ else
     echo "⚠ Nginx config not found — skipping"
 fi
 
+AVAHI_SRC="$INSTALL_DIR/deployment/avahi/pixelcast.service"
+if [ -f "$AVAHI_SRC" ]; then
+    mkdir -p "${DEPLOY_ROOT}/etc/avahi/services" /etc/avahi/services
+    cp "$AVAHI_SRC" "${DEPLOY_ROOT}/etc/avahi/services/pixelcast.service"
+    cp "$AVAHI_SRC" /etc/avahi/services/pixelcast.service
+    echo "✓ Avahi service definition installed"
+else
+    echo "⚠ Avahi service definition not found — skipping"
+fi
+
 # ── Unmount ──────────────────────────────────────────────────────────────────
 if [ -n "$MOUNTED_TMP" ]; then
     umount "$MOUNTED_TMP"
@@ -163,6 +173,7 @@ fi
 
 # ── Reload Nginx + start service ──────────────────────────────────────────────
 nginx -t && systemctl reload nginx && echo "✓ Nginx reloaded"
+systemctl restart avahi-daemon && echo "✓ Avahi restarted"
 ENDSSH
 
 echo "[5/5] Starting service..."
