@@ -102,11 +102,6 @@ class _OutputThread(threading.Thread):
         self._height  = height
         self._queue   = queue.Queue(maxsize=1)
         self._stop    = threading.Event()
-        self.dropped  = 0
-        self.frame_count = 0
-        self._t_last_fps   = time.perf_counter()
-        self._fps_count    = 0
-        self._current_fps  = 0.0
 
         # GPIO path: persistent FrameCanvas for double-buffered swap
         self._canvas = None
@@ -128,7 +123,6 @@ class _OutputThread(threading.Thread):
         if self._queue.full():
             try:
                 self._queue.get_nowait()
-                self.dropped += 1
             except queue.Empty:
                 pass
         try:
@@ -167,17 +161,6 @@ class _OutputThread(threading.Thread):
             self._canvas = self._matrix_hw.swap_canvas(self._canvas)
         else:
             self._output.send_frame(pil)
-
-        self.frame_count += 1
-        self._fps_count  += 1
-        now = time.perf_counter()
-        if now - self._t_last_fps >= 5.0:
-            fps = self._fps_count / (now - self._t_last_fps)
-            self._current_fps = fps
-            log.debug(f"OutputThread: {fps:.1f} fps "
-                      f"(dropped={self.dropped})")
-            self._fps_count  = 0
-            self._t_last_fps = now
 
 
 class MatrixEngine:
@@ -275,17 +258,6 @@ class MatrixEngine:
             'current':    item,
             'brightness': self.cfg['brightness'],
             'resolution': f"{self.width}x{self.height}"
-        }
-
-    def get_perf_stats(self) -> dict:
-        """Return live output-thread performance counters."""
-        t = self._out_thread
-        return {
-            'frames_output': t.frame_count,
-            'frames_dropped': t.dropped,
-            'fps': round(t._current_fps, 1),
-            'canvas_mode': 'FrameCanvas+SwapOnVSync' if t._canvas is not None
-                           else 'SetImage (no FrameCanvas)',
         }
 
     # ------------------------------------------------------------------

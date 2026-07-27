@@ -191,12 +191,6 @@ canvas.spark {
 
       <div style="margin-top:10px; font-size:11px; color:var(--muted);
                   display:flex; justify-content:space-between;">
-        <span>Render FPS: <span id="s-fps">—</span></span>
-        <span id="s-dropped"></span>
-      </div>
-
-      <div style="margin-top:6px; font-size:11px; color:var(--muted);
-                  display:flex; justify-content:space-between;">
         <span>Uptime: <span id="s-uptime">—</span></span>
         <span id="s-updated">—</span>
       </div>
@@ -575,21 +569,8 @@ function fetchStats() {
   }).catch(()=>{});
 }
 
-function fetchPerf() {
-  fetch('/system/perf').then(r => r.json()).then(d => {
-    if (d.error) return;
-    document.getElementById('s-fps').textContent = `${d.fps} fps`;
-    document.getElementById('s-dropped').textContent =
-      d.frames_dropped > 0 ? `dropped: ${d.frames_dropped}` : '';
-  }).catch(()=>{});
-}
-
-function fetchAll() {
-  fetchStats();
-  fetchPerf();
-}
-fetchAll();
-setInterval(fetchAll, 5000);
+fetchStats();
+setInterval(fetchStats, 5000);
 
 // ---- System actions (restart/poweroff) ----
 function sysAction(url, msg) {
