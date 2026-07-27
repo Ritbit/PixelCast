@@ -199,7 +199,12 @@ class GPIOOutput(BaseOutput):
         if pixel_mapper:
             options.pixel_mapper_config = pixel_mapper
 
+        # RGBMatrix() spawns the native GPIO refresh thread — capture the
+        # thread-id set before/after construction so we can pin only the
+        # newly-created thread to the isolated CPU core (isolcpus=3).
+        tids_before = self._thread_ids()
         self._matrix = RGBMatrix(options=options)
+        self._pin_new_threads(tids_before, cpu=3)
         log.info("GPIOOutput: RGBMatrix hardware initialised")
 
     # ── helpers ───────────────────────────────────────────────────────────────
