@@ -21,7 +21,7 @@
 ║ PixelCast - Professional LED Matrix Signage System                           ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
 ║ File:        signage/web/routes.py                                           ║
-║ Version:     1.3.1                                                           ║
+║ Version:     1.3.2                                                           ║
 ║ Author:      B. van Ritbergen <bas@ritbit.com>                               ║
 ║ Description: All Flask route blueprints - dashboard, playlist, files,        ║
 ║              control, schedule, settings, alerts, logs, and system routes.   ║
@@ -1469,7 +1469,7 @@ def health():
         'paused':              engine._pause_event.is_set(),
         'last_frame_age_s':    round(age, 2),
         'playlist_length':     len(playlist),
-        'version':             '1.3.1'
+        'version':             '1.3.2'
     })
 
 

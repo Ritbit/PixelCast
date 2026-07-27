@@ -1,6 +1,6 @@
 # PixelCast — Implemented Features Reference
 
-**Last Updated**: June 2026 | Version: 1.3.1
+**Last Updated**: June 2026 | Version: 1.3.2
 
 This document describes all implemented features in the current codebase.
 
