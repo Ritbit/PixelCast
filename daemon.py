@@ -39,6 +39,8 @@ import signal
 import logging
 import threading
 import argparse
+import subprocess
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -63,6 +65,65 @@ shutdown_event = threading.Event()
 
 
 beeper = None
+
+
+def _network_details():
+    ssid = ''
+    try:
+        result = subprocess.run(
+            ['iwgetid', '--raw'], capture_output=True, text=True,
+            timeout=2, check=False)
+        ssid = result.stdout.strip()
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    addresses = []
+    try:
+        result = subprocess.run(
+            ['ip', '-4', '-o', 'addr', 'show', 'scope', 'global'],
+            capture_output=True, text=True, timeout=2, check=False)
+        for line in result.stdout.splitlines():
+            fields = line.split()
+            if len(fields) >= 4 and fields[2] == 'inet':
+                addresses.append((fields[1], fields[3].split('/')[0]))
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    if ssid:
+        for interface, address in addresses:
+            if interface.startswith(('wl', 'wifi')):
+                return ssid, address
+    return ssid, addresses[0][1] if addresses else ''
+
+
+def _show_network_splash(matrix):
+    from signage.renderer.text import TextRenderer
+
+    deadline = time.monotonic() + 20
+    ssid, address = _network_details()
+    while not address and time.monotonic() < deadline:
+        renderer = TextRenderer({
+            'lines': [{'text': 'Connecting to network...', 'font_size': 18,
+                       'color': [255, 220, 0], 'align': 'center'}],
+            'bg_color': [0, 0, 0],
+        }, matrix.width, matrix.height)
+        matrix.show_frame(renderer.first_frame())
+        time.sleep(1)
+        ssid, address = _network_details()
+
+    lines = [
+        {'text': 'SSID: ' + (ssid or 'unavailable'), 'font_size': 18,
+         'color': [255, 220, 0], 'align': 'center'},
+        {'text': 'IP: ' + (address or 'unavailable'), 'font_size': 20,
+         'color': [255, 255, 255], 'align': 'center'},
+    ]
+    renderer = TextRenderer({'lines': lines, 'v_center': True,
+                             'bg_color': [0, 0, 0]},
+                            matrix.width, matrix.height)
+    matrix.show_frame(renderer.first_frame())
+    log.info("Network splash: SSID=%s, IP=%s", ssid or 'unavailable',
+             address or 'unavailable')
+    time.sleep(5)
 
 
 def signal_handler(sig, frame):
@@ -126,6 +187,7 @@ def main():
     global engine, scheduler, beeper
     watchdog: Watchdog = None
     engine = MatrixEngine(config_path=args.config, playlist=playlist)
+    _show_network_splash(engine)
 
     engine_thread = threading.Thread(
         target=engine.run, name='MatrixEngine', daemon=True)

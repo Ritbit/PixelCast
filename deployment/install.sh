@@ -183,7 +183,14 @@ fi
 step "8. Enable mDNS (avahi) for .local hostname access"
 # =============================================================================
 systemctl enable --now avahi-daemon
-log "Avahi mDNS daemon enabled — device reachable as $(hostname).local"
+AVAHI_SERVICE_SRC="$SIGNAGE_DIR/deployment/avahi/pixelcast.service"
+if [ -f "$AVAHI_SERVICE_SRC" ]; then
+    install -Dm644 "$AVAHI_SERVICE_SRC" /etc/avahi/services/pixelcast.service
+    systemctl restart avahi-daemon
+    log "Avahi mDNS enabled — device reachable as $(hostname).local and discoverable as PixelCast"
+else
+    warn "Avahi service definition not found at $AVAHI_SERVICE_SRC"
+fi
 
 # =============================================================================
 step "9. Install systemd service"
