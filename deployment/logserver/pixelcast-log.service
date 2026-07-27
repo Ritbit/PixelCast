@@ -1,0 +1,15 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<!--
+  Generic Avahi mDNS advertisement for a PixelCast-compatible log server.
+  Drop this into /etc/avahi/services/ on ANY syslog server that should be
+  auto-discovered by PixelCast devices on the local network — nothing here
+  is site-specific. Adjust <port> if your syslog receiver listens elsewhere.
+-->
+<service-group>
+  <name replace-wildcards="yes">PixelCast Log Server on %h</name>
+  <service>
+    <type>_pixelcast-log._tcp</type>
+    <port>514</port>
+  </service>
+</service-group>

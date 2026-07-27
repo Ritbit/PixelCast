@@ -25,6 +25,9 @@
 <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
   <h1 class="page-title" style="margin:0;">System Logs</h1>
   <div style="display:flex; gap:8px; align-items:center;">
+    <span class="text-muted" style="font-size:12px; display:flex; align-items:center;" id="forward-status">
+      <span class="status-dot stopped" id="forward-dot"></span>Checking log forwarding…
+    </span>
     <span class="text-muted" style="font-size:12px;" id="log-status">Loading…</span>
     <button class="btn btn-sm btn-secondary" onclick="scrollBottom()">⬇ Bottom</button>
     <button class="btn btn-sm btn-secondary" onclick="clearLog()">🗑 Clear</button>
@@ -121,6 +124,25 @@ function scheduleRefresh() {
     refreshTimer = setTimeout(() => { fetchLogs(); scheduleRefresh(); }, 5000);
   }
 }
+
+function fetchForwardStatus() {
+  fetch('/system/logs/forward-status')
+    .then(r => r.json())
+    .then(d => {
+      const dot = document.getElementById('forward-dot');
+      const el  = document.getElementById('forward-status');
+      if (d.connected) {
+        dot.className = 'status-dot playing';
+        el.lastChild.textContent = `Forwarding to ${d.host}`;
+      } else {
+        dot.className = 'status-dot stopped';
+        el.lastChild.textContent = 'Log forwarding: not connected';
+      }
+    })
+    .catch(() => {});
+}
+fetchForwardStatus();
+setInterval(fetchForwardStatus, 15000);
 
 document.getElementById('auto-refresh').addEventListener('change', () => {
   scheduleRefresh();

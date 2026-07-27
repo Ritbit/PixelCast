@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodically re-run PixelCast log server mDNS discovery
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=5min
+Unit=PixelCast-logdiscovery.service
+
+[Install]
+WantedBy=timers.target

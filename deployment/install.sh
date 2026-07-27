@@ -214,6 +214,43 @@ else
 fi
 
 # =============================================================================
+step "9b. Install remote log forwarding (mDNS-discovered log server)"
+# =============================================================================
+# No log server is hardcoded anywhere. A oneshot service + timer looks for
+# a host on the local network advertising _pixelcast-log._tcp via mDNS and
+# generates the rsyslog forward config dynamically (see
+# deployment/scripts/discover-logserver.sh). If none is found, logging just
+# stays local (journald) — nothing breaks.
+#
+# Forwarding itself uses an in-memory queue only (no queue.filename/
+# maxdiskspace) so nothing is ever spooled to the SD card, and 'stop' in
+# the generated drop-in prevents rsyslog's default rules from also writing
+# local /var/log/* files.
+DISCOVERY_SCRIPT_SRC="$SIGNAGE_DIR/deployment/scripts/discover-logserver.sh"
+DISCOVERY_SVC_SRC="$SIGNAGE_DIR/deployment/systemd/PixelCast-logdiscovery.service"
+DISCOVERY_TIMER_SRC="$SIGNAGE_DIR/deployment/systemd/PixelCast-logdiscovery.timer"
+
+if [ -f "$DISCOVERY_SCRIPT_SRC" ] && [ -f "$DISCOVERY_SVC_SRC" ] && [ -f "$DISCOVERY_TIMER_SRC" ]; then
+    apt-get install -y --no-install-recommends rsyslog avahi-utils
+
+    sed -i 's/^#\?ForwardToSyslog=.*/ForwardToSyslog=yes/' /etc/systemd/journald.conf
+    grep -q '^ForwardToSyslog=yes' /etc/systemd/journald.conf || \
+        echo 'ForwardToSyslog=yes' >> /etc/systemd/journald.conf
+    systemctl restart systemd-journald
+
+    chmod +x "$DISCOVERY_SCRIPT_SRC"
+    cp "$DISCOVERY_SVC_SRC" /etc/systemd/system/PixelCast-logdiscovery.service
+    cp "$DISCOVERY_TIMER_SRC" /etc/systemd/system/PixelCast-logdiscovery.timer
+
+    systemctl daemon-reload
+    systemctl enable --now rsyslog
+    systemctl enable --now PixelCast-logdiscovery.timer
+    log "Log discovery enabled — will forward to any host advertising _pixelcast-log._tcp"
+else
+    warn "Log discovery files not found — skipping (see deployment/scripts, deployment/systemd)"
+fi
+
+# =============================================================================
 step "10. SD card protection — overlay filesystem"
 # =============================================================================
 # Configures the root filesystem as read-only with a tmpfs overlay so that

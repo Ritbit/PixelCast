@@ -1,0 +1,11 @@
+[Unit]
+Description=PixelCast - Discover mDNS log server and configure rsyslog forwarding
+After=network-online.target avahi-daemon.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/PixelCast/led-signage/deployment/scripts/discover-logserver.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=log-discovery

@@ -1504,6 +1504,23 @@ def logs_data():
     return jsonify({'lines': raw_lines})
 
 
+LOGFORWARD_STATUS_FILE = '/run/pixelcast/logforward-status.json'
+
+
+@system_bp.route('/logs/forward-status')
+@login_required
+def logs_forward_status():
+    if not os.path.isfile(LOGFORWARD_STATUS_FILE):
+        return jsonify({'connected': False, 'host': None, 'last_checked': None,
+                         'unavailable': True})
+    try:
+        with open(LOGFORWARD_STATUS_FILE) as f:
+            return jsonify(json.load(f))
+    except Exception as e:
+        return jsonify({'connected': False, 'host': None, 'last_checked': None,
+                         'error': str(e)})
+
+
 # ---------------------------------------------------------------------------
 # System statistics
 # ---------------------------------------------------------------------------

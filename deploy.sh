@@ -165,6 +165,21 @@ else
     echo "⚠ Avahi service definition not found — skipping"
 fi
 
+DISCOVERY_SCRIPT_SRC="$INSTALL_DIR/deployment/scripts/discover-logserver.sh"
+DISCOVERY_SVC_SRC="$INSTALL_DIR/deployment/systemd/PixelCast-logdiscovery.service"
+DISCOVERY_TIMER_SRC="$INSTALL_DIR/deployment/systemd/PixelCast-logdiscovery.timer"
+if [ -f "$DISCOVERY_SCRIPT_SRC" ] && command -v rsyslogd >/dev/null 2>&1; then
+    chmod +x "$DISCOVERY_SCRIPT_SRC"
+    mkdir -p "${DEPLOY_ROOT}/etc/systemd/system"
+    cp "$DISCOVERY_SVC_SRC" "${DEPLOY_ROOT}/etc/systemd/system/PixelCast-logdiscovery.service"
+    cp "$DISCOVERY_TIMER_SRC" "${DEPLOY_ROOT}/etc/systemd/system/PixelCast-logdiscovery.timer"
+    cp "$DISCOVERY_SVC_SRC" /etc/systemd/system/PixelCast-logdiscovery.service
+    cp "$DISCOVERY_TIMER_SRC" /etc/systemd/system/PixelCast-logdiscovery.timer
+    echo "✓ Log discovery service/timer synced"
+else
+    echo "⚠ rsyslog not installed or discovery script missing — run install.sh to set up log forwarding — skipping"
+fi
+
 # ── Unmount ──────────────────────────────────────────────────────────────────
 if [ -n "$MOUNTED_TMP" ]; then
     umount "$MOUNTED_TMP"
@@ -174,6 +189,8 @@ fi
 # ── Reload Nginx + start service ──────────────────────────────────────────────
 nginx -t && systemctl reload nginx && echo "✓ Nginx reloaded"
 systemctl restart avahi-daemon && echo "✓ Avahi restarted"
+systemctl daemon-reload
+systemctl restart PixelCast-logdiscovery.timer 2>/dev/null && echo "✓ Log discovery timer restarted"
 ENDSSH
 
 echo "[5/5] Starting service..."
