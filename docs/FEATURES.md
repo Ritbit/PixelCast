@@ -103,6 +103,7 @@ Tested and supported configuration:
 ## Architecture rules — read carefully, never violate
 
 **Threading:**
+
 - `MatrixEngine` runs in one daemon thread and is the **sole** caller of
   `matrix.SetImage()` and `matrix.brightness`. Nothing else may touch
   the RGBMatrix object.
@@ -112,17 +113,20 @@ Tested and supported configuration:
 - `Scheduler` runs in a third daemon thread, also uses only the public API.
 
 **Frame format:**
+
 - All frames are `numpy (H, W, 3) uint8 RGB` arrays.
 - `engine.show_frame(arr)` is the only way to push a frame to the display.
 - `engine.get_current_frame()` returns a thread-safe copy of the last frame.
 
 **Renderer contract:**
+
 - `first_frame()` → single numpy array (used by transition engine as dst)
 - `frames()` → generator yielding numpy arrays indefinitely
 - `close()` → release resources
 - Renderers must NOT sleep for longer than one frame period inside `frames()`
 
 **Transition contract:**
+
 - `get_transition(name, duration_seconds)` returns a transition instance
 - `.frames(src, dst, w, h)` → generator of intermediate numpy frames
 - The LAST frame yielded must be exactly `dst` — no colour drift allowed
@@ -138,16 +142,19 @@ Tested and supported configuration:
 ## Critical Jinja2 constraints
 
 These Python builtins are NOT available in Jinja2 templates:
+
 - `tuple()` → use `| rgb_hex` filter instead for color conversion
 - `enumerate()` → use `loop.index0` instead
 - `range()` → use `{% for i in range(n) %}` only works if passed from route
 
 Custom filters (registered in `filters.py`, available in all templates):
+
 - `{{ color_list | rgb_hex }}` → `'#rrggbb'` string for `<input type=color>`
 - `{{ path | basename }}` → filename only
 - `{{ offset | timecode }}` → display-friendly timecode string
 
 Template block structure (must match exactly):
+
 ```jinja
 {% extends 'base.html' %}
 {% block title %}Page Title{% endblock %}
@@ -159,6 +166,7 @@ Template block structure (must match exactly):
   ...optional JS...
 {% endblock %}
 ```
+
 Always verify block open/close counts match before saving a template.
 
 ---

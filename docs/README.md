@@ -5,7 +5,9 @@ This directory contains all project documentation.
 ## Documentation Files
 
 ### DOCUMENTATION_GUIDE.md
+
 Complete guide for code documentation standards including:
+
 - File header format
 - Class and function docstring templates
 - Parameter and return value documentation
@@ -14,7 +16,9 @@ Complete guide for code documentation standards including:
 Use this as a reference when adding documentation to new code.
 
 ### CLAUDE_PROJECT_CONTEXT.md
+
 Comprehensive project context including:
+
 - System architecture overview
 - Component descriptions
 - Technical implementation details
@@ -24,10 +28,13 @@ Comprehensive project context including:
 This is the main technical reference document.
 
 ### CLAUDE_PROJECT_QUICKREF.md
+
 Quick reference notes for common tasks and patterns.
 
 ### FEATURES.md
+
 Feature list, roadmap, and development notes including:
+
 - Implemented features
 - Planned enhancements
 - Known issues
@@ -54,6 +61,7 @@ When adding new features or making significant changes:
 ## Documentation Standards
 
 All code should include:
+
 - File headers with project name, version, author, description
 - Class docstrings describing purpose and usage
 - Function/method docstrings with parameters and return values

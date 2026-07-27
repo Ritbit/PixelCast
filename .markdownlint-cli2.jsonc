@@ -1,0 +1,14 @@
+{
+  // Project-wide markdownlint config.
+  // MD013 (line-length) and MD033 (inline-html) are disabled: this repo's
+  // docs intentionally use long descriptive lines/tables and inline HTML
+  // (badges, centered images) in README.md.
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD033": false,
+    "MD025": false
+  },
+  "globs": ["**/*.md"],
+  "ignores": ["**/node_modules/**"]
+}

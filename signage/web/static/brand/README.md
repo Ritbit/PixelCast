@@ -17,6 +17,7 @@ This directory contains the PixelCast branding assets (logos, icons, favicons) t
 These files are served via Flask's static file handler at `/static/brand/`.
 
 In templates, reference them using:
+
 ```jinja2
 {{ url_for('static', filename='brand/pixelcast-icon-48.svg') }}
 ```

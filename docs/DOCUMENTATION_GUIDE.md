@@ -175,6 +175,7 @@ class AlertManager:
 ## Next Steps
 
 Continue adding docstrings to:
+
 - All classes in signage/ modules
 - All public methods and functions
 - Complex private methods that need clarification

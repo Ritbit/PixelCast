@@ -31,7 +31,7 @@
 ## Hardware Requirements
 
 | Component | Specification |
-|-----------|---------------|
+| ----------- | --------------- |
 | **Controller** | Raspberry Pi 4B (or compatible) |
 | **HAT** | ElectroDragon MPC1073 HUB75 HAT (or compatible) |
 | **LED Panels** | HUB75/HUB75E compatible panels |
@@ -47,6 +47,7 @@
 ### Installation
 
 1. **Clone or download** the project to your Raspberry Pi:
+
    ```bash
    cd /opt/PixelCast
    git clone <repository-url> led-signage
@@ -54,6 +55,7 @@
    ```
 
 2. **Run the installation script**:
+
    ```bash
    sudo bash deployment/install.sh
    ```
@@ -88,7 +90,8 @@ See [DEPLOY_INSTRUCTIONS.md](DEPLOY_INSTRUCTIONS.md) for detailed deployment gui
 ## Directory Structure
 
 ### Development (Repository)
-```
+
+```text
 pixelcast/
 ├── daemon.py                    # Main entry point
 ├── requirements.txt             # Python dependencies
@@ -159,12 +162,14 @@ pixelcast/
 ## Web Interface
 
 ### Dashboard
+
 - Live MJPEG preview of current display
 - Playback controls (play/pause, skip, previous, go-to item)
 - Brightness control
 - System status with per-item duration display
 
 ### Playlist Manager
+
 - Drag-and-drop reordering
 - Per-item configuration
 - Import/export playlists
@@ -172,17 +177,20 @@ pixelcast/
 - Date range filtering
 
 ### File Manager
+
 - Drag-and-drop upload
 - Thumbnail previews
 - Auto-transcoding status
 - Delete with cascade
 
 ### Schedule Editor
+
 - Time-based on/off/dim rules
 - Day-of-week selection
 - Multiple rule support
 
 ### Settings
+
 - Hardware configuration
 - User management (admin only)
 - API key management
@@ -199,7 +207,7 @@ Authentication: `Authorization: Bearer <api_key>` or `?api_key=<key>`
 ### Key Endpoints
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+| -------- | ---------- | ------------- |
 | GET | `/health` | Health check (no auth) |
 | GET | `/status` | Full system status |
 | GET | `/playlist` | Get all playlist items |
@@ -254,7 +262,7 @@ echo "blacklist snd_bcm2835" | sudo tee /etc/modprobe.d/blacklist-rgb-matrix.con
 Three role levels with ascending privileges:
 
 | Role | View | Edit Playlist | Upload Files | Send Alerts | Settings | User Mgmt | System |
-|------|------|---------------|--------------|-------------|----------|-----------|--------|
+| ------ | ------ | --------------- | -------------- | ------------- | ---------- | ----------- | -------- |
 | **viewer** | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | **editor** | ✓ | ✓ | ✓ | ✓ | brightness | ✗ | ✗ |
 | **admin** | ✓ | ✓ | ✓ | ✓ | full | ✓ | ✓ |
@@ -308,7 +316,7 @@ sudo systemctl restart PixelCast
 journalctl -u PixelCast -n 100
 ```
 
-### Web Interface
+### Web Interface Issues
 
 - **502 Bad Gateway**: Service not running, check `systemctl status`
 - **Login fails**: Check `config/users.json` permissions

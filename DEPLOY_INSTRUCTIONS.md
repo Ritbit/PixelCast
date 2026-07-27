@@ -4,7 +4,7 @@
 
 PixelCast uses a clean separation between code and data:
 
-```
+```text
 /opt/PixelCast/
 ├── led-signage/     # Application code (replaced on updates)
 ├── config/          # Configuration (persistent)
@@ -23,6 +23,7 @@ cd /Users/bas/Documents/Code/RitBit-led-signage
 ```
 
 This will:
+
 1. Package the application code
 2. Upload to server
 3. Extract to `/opt/PixelCast/led-signage`
@@ -86,6 +87,7 @@ journalctl -u PixelCast -f
 ## What Gets Deployed
 
 **Application Code** (replaced on each deployment):
+
 - `signage/` - Python package with all modules
   - `signage/web/static/brand/` - Brand assets (logos, favicons)
   - `signage/web/templates/` - HTML templates
@@ -95,6 +97,7 @@ journalctl -u PixelCast -f
 - `deployment/` - Deployment configs (Nginx, systemd)
 
 **Persistent Data** (never touched by deployments):
+
 - `/opt/PixelCast/config/` - Configuration files
   - `panel.json` - Hardware configuration
   - `playlist.json` - Content playlist
@@ -107,7 +110,7 @@ journalctl -u PixelCast -f
 
 ## Directory Structure
 
-```
+```text
 /opt/PixelCast/
 ├── led-signage/              # Code (replaceable)
 │   ├── signage/
@@ -148,6 +151,7 @@ curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost/api/v1/status
 ## Troubleshooting
 
 ### Service won't start
+
 ```bash
 # Check logs for errors
 journalctl -u PixelCast -n 50
@@ -159,6 +163,7 @@ ls -la /opt/PixelCast/media/
 ```
 
 ### Static files not loading (403 errors)
+
 ```bash
 # Check Nginx config
 sudo nginx -t
@@ -171,7 +176,9 @@ sudo systemctl reload nginx
 ```
 
 ### Playlist paths broken
+
 If you migrated from an old installation, playlist may have absolute paths. Fix with:
+
 ```bash
 sudo sed -i 's|/root/led-signage/media/|media/|g' /opt/PixelCast/config/playlist.json
 sudo sed -i 's|/opt/PixelCast/led-signage/media/|media/|g' /opt/PixelCast/config/playlist.json

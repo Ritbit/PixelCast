@@ -6,7 +6,7 @@ This document describes the project structure with clean separation between code
 
 ## Development Structure (Repository)
 
-```
+```text
 pixelcast/
 ├── daemon.py                       # Main entry point
 ├── requirements.txt                # Python dependencies
@@ -74,7 +74,7 @@ pixelcast/
 
 ## Production Structure (Deployed)
 
-```
+```text
 /opt/PixelCast/
 ├── led-signage/                    # 📦 Application Code (replaceable)
 │   ├── daemon.py
@@ -107,30 +107,36 @@ pixelcast/
 ## Design Principles
 
 ### 1. Code/Data Separation (Production)
+
 In production (`/opt/PixelCast`), code and data are completely separated:
+
 - **Application code** (`led-signage/`) - Can be replaced during updates
 - **Configuration** (`config/`) - Persistent, survives updates
 - **Media files** (`media/`) - Persistent, survives updates
 - **Relative paths** - Playlist uses `media/video.mp4`, not absolute paths
 
 **Benefits:**
+
 - Clean updates without touching user data
 - Easy backups (just backup `config/` and `media/`)
 - No path fixing needed after updates
 - Clear separation of concerns
 
 ### 2. Separation of Concerns (Development)
+
 - **Source code** (`signage/`) - Python package
 - **Documentation** (`docs/`) - All project documentation
 - **Deployment** (`deployment/`) - Installation and configuration
 - **Static assets** (`signage/web/static/brand/`) - Brand assets served by Nginx
 
 ### 3. Clear Entry Points
+
 - `daemon.py` - Main application entry point
 - `deployment/install.sh` - Installation entry point
 - `deploy.sh` - Deployment script for updates
 
 ### 4. Git-Friendly
+
 - Runtime data excluded via .gitignore
 - Brand assets included in repo at `signage/web/static/brand/`
 - Config templates can be versioned
@@ -139,6 +145,7 @@ In production (`/opt/PixelCast`), code and data are completely separated:
 ## Key Paths Reference
 
 ### Production Paths
+
 | Component     | Path                                             | Purpose                    |
 |---------------|--------------------------------------------------|----------------------------|
 | Application   | `/opt/PixelCast/led-signage/`                    | Replaceable code           |
@@ -148,6 +155,7 @@ In production (`/opt/PixelCast`), code and data are completely separated:
 | Static Assets | `/opt/PixelCast/led-signage/signage/web/static/` | Served by Nginx            |
 
 ### Deployment
+
 - **Install**: `sudo bash deployment/install.sh`
 - **Update**: `./deploy.sh` (from development machine)
 - **Service**: `sudo systemctl {start|stop|restart|status} PixelCast`
@@ -165,12 +173,14 @@ In production (`/opt/PixelCast`), code and data are completely separated:
 ## Deployment Workflow
 
 ### Initial Installation
+
 ```bash
 # On Raspberry Pi
 sudo bash deployment/install.sh
 ```
 
 ### Updates
+
 ```bash
 # From development machine
 ./deploy.sh

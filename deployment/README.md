@@ -52,6 +52,7 @@ sudo bash deployment/install.sh
 ```
 
 After installation:
+
 ```bash
 # Start the service
 sudo systemctl start PixelCast
@@ -66,6 +67,7 @@ sudo journalctl -u PixelCast -f
 ## Systemd Service
 
 The service file (`systemd/PixelCast.service`) configures:
+
 - Runs as root (required for GPIO access)
 - Auto-restart on failure
 - Starts after network is available
@@ -92,6 +94,7 @@ sudo systemctl restart PixelCast
 ## Nginx Configuration
 
 The `nginx/pixelcast.conf` file provides:
+
 - Reverse proxy from port 80 to Flask (port 5000)
 - WebSocket support for real-time updates
 - Static file serving
@@ -109,6 +112,7 @@ sudo systemctl reload nginx
 ## Hardware Configuration
 
 Default configuration for:
+
 - **Panels**: 4x P2.5 128x64 HUB75E panels (2x2 grid)
 - **Resolution**: 256x128 pixels total
 - **HAT**: ElectroDragon MPC1073 HUB75 HAT
@@ -120,6 +124,7 @@ Edit `config/panel.json` after installation to customize.
 ## Troubleshooting
 
 ### Service won't start
+
 ```bash
 # Check logs
 sudo journalctl -u PixelCast -n 50
@@ -129,6 +134,7 @@ sudo python3 /opt/PixelCast/led-signage/daemon.py
 ```
 
 ### Display issues
+
 ```bash
 # Test hardware with demo
 sudo /opt/PixelCast/rpi-rgb-led-matrix/examples-api-use/demo \
@@ -137,8 +143,10 @@ sudo /opt/PixelCast/rpi-rgb-led-matrix/examples-api-use/demo \
 ```
 
 ### Audio conflicts
+
 Ensure audio is disabled in `/boot/firmware/config.txt` (or `/boot/config.txt`):
-```
+
+```text
 dtparam=audio=off
 ```
 

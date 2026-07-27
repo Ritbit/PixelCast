@@ -37,6 +37,7 @@ Strong technical opinions and disagreements are normal
 in engineering projects.
 
 Debate is welcome, but keep it focused on:
+
 - facts
 - implementation
 - design trade-offs

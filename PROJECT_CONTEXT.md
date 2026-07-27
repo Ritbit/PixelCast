@@ -10,7 +10,7 @@
 ## Hardware
 
 | Component | Detail |
-|---|---|
+| --- | --- |
 | Controller | Raspberry Pi 4B |
 | HAT | ElectroDragon MPC1073 HUB75 HAT |
 | Panels | 4× P2.5 128×64 HUB75E panels, arranged 2×2 |
@@ -21,13 +21,15 @@
 | Python | 3.13 |
 
 **Critical hardware notes:**
+
 - Onboard audio MUST be disabled (`dtparam=audio=off` + blacklist `snd_bcm2835`) — conflicts with matrix PWM
 - MPC1073 has 3 parallel outputs: P0→panels 1+2 (top row), P1→panels 3+4 (bottom row)
 - All binaries and daemon must run as root for GPIO access
 - Panels need dedicated 5V PSU — NOT from Pi GPIO rail
 
 **Working hzeller flags:**
-```
+
+```text
 --led-gpio-mapping=regular
 --led-rows=64 --led-cols=128
 --led-chain=2 --led-parallel=2
@@ -39,7 +41,7 @@
 
 ## Project File Structure
 
-```
+```text
 /opt/PixelCast/led-signage/
 ├── daemon.py                    # Entry point — starts engine + web + scheduler
 ├── install.sh                   # Full redeploy script
@@ -108,7 +110,8 @@
 ## Architecture
 
 ### Threading model
-```
+
+```text
 main thread       → shutdown_event.wait()                         CPU 0
 MatrixEngine      → daemon thread, runs render loop               CPU 1 (pinned)
 _OutputThread     → daemon thread, FrameCanvas + SwapOnVSync      CPU 2 (pinned)
@@ -130,7 +133,8 @@ VideoPreBuffer    → daemon thread per video item
 - `GPIOOutput.create_canvas()` / `swap_canvas()` expose FrameCanvas API
 
 ### Display loop (matrix.py — MatrixEngine.run())
-```
+
+```text
 advance playlist → check date range → create renderer → get first_frame()
 → background pre-render of next static item
 → run wipe-in transition (skip if prev wipe-out already landed on this frame)
@@ -141,6 +145,7 @@ advance playlist → check date range → create renderer → get first_frame()
 ```
 
 **Critical details:**
+
 - `prev_wipeout_target`: if wipe-out already displayed next item's first frame, skip the wipe-in. Prevents double-show.
 - `_test_mode` (threading.Event): set → engine idles; `show_frame(_from_test=True)` bypasses the guard
 - `_done` flag on renderer: used by engine for auto-duration items
@@ -150,12 +155,14 @@ advance playlist → check date range → create renderer → get first_frame()
 - Transitions are **streamed** (generator, not pre-computed list) — first frame shown within first iteration
 
 ### Renderer contract
+
 ```python
 renderer.first_frame() → np.ndarray (H, W, 3) uint8 RGB
 renderer.frames()      → generator yielding np.ndarray, runs until close()
 renderer.close()       → cleanup resources
 renderer._done         → bool, set True when content complete (for auto-duration)
 ```
+
 - `lightweight=True` in constructor → skip network fetches and pre-buffering (used for peek/transition)
 - All renderers call `time.sleep()` inside `frames()` to pace output
 - `renderer._first` attribute may be injected by engine if a pre-rendered frame is available
@@ -278,7 +285,7 @@ renderer._done         → bool, set True when content complete (for auto-durati
 
 ## Text Inline Style Codes
 
-```
+```text
 §Crrggbb;   — change color (hex, e.g. §Cff0000; = red)
 §Fname;     — change font (e.g. §FFreeSansBold.ttf;)
 §Snn;       — change font size (e.g. §S24;)
@@ -293,6 +300,7 @@ Control characters below ASCII 32 are stripped (except `\n` and `\t`).
 ## LED Pixel Rendering
 
 Fonts at ≤16px use hard-pixel rendering (no anti-aliasing):
+
 - Renders to greyscale `L` image, thresholds at 32/255, converts to binary mask
 - Eliminates sub-pixel colour bleed visible at 2.5mm LED pitch
 - `pixel_font: true` on any item forces this mode regardless of size
@@ -304,6 +312,7 @@ Fonts at ≤16px use hard-pixel rendering (no anti-aliasing):
 ## Auto Duration
 
 Set `"duration": "auto"` on an item. Engine advances when `renderer._done = True`:
+
 - **Text**: fires after all scrolling lines complete `loop_count` passes (default 1 for auto-dur)
 - **Video**: fires after `loop_count` plays
 - 0.15s grace period after `_done` so last pixel clears the screen
@@ -315,6 +324,7 @@ Set `"duration": "auto"` on an item. Engine advances when `renderer._done = True
 ## Scroll Strip Caching
 
 Left/right/up/down scrolls pre-render a full numpy strip in `__init__`:
+
 - H-scroll: `(display_h, text_w + gap × 2, 3)` strip, sliced each frame
 - V-scroll: `(display_h + content_h + display_h, display_w, 3)` strip
 - Background tiled into strip during build
@@ -325,6 +335,7 @@ Left/right/up/down scrolls pre-render a full numpy strip in `__init__`:
 ## Video Transcoding
 
 On upload, every video is automatically transcoded to 256×128 25fps H.264:
+
 - `transcoder.transcode_async()` runs in background thread
 - Output: `media/original_name.matrix.mp4`
 - `resolve_video_path()` transparently returns `.matrix.mp4` if it exists
@@ -349,10 +360,10 @@ Each has `wipe_in` / `wipe_out` + `wipe_in_speed` / `wipe_out_speed` (0.1–5.0)
 Three roles with ascending privilege:
 
 | Role | Dashboard | Playlist R | Playlist W | Files W | Alert | Settings | User Mgmt | Reboot |
-|---|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | viewer | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | editor | ✓ | ✓ | ✓ | ✓ | ✓ | brightness | ✗ | ✗ |
-| admin  | ✓ | ✓ | ✓ | ✓ | ✓ | full | ✓ | ✓ |
+| admin | ✓ | ✓ | ✓ | ✓ | ✓ | full | ✓ | ✓ |
 
 - Credentials in `config/users.json` (SHA-256 hashed passwords)
 - Default: `admin` / `admin` — change immediately
@@ -369,7 +380,7 @@ Auth: `Authorization: Bearer <key>` or `?api_key=<key>`
 API key: shown in Settings, stored in `config/users.json` as `"api_key"`
 
 | Method | Endpoint | Auth | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/health` | none | Service health check |
 | GET | `/status` | ✓ | Full engine + playlist status |
 | GET | `/playlist` | ✓ | All playlist items |
@@ -422,7 +433,7 @@ Legacy single-text format also accepted: `{"text": "...", "color": [R,G,B], "dur
 ## Web UI Routes (full list)
 
 | Blueprint | Route | Role | Description |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | main | GET / | viewer | Dashboard + MJPEG preview |
 | main | GET/POST /login | — | Login |
 | main | GET /logout | any | Logout |
@@ -471,6 +482,7 @@ Legacy single-text format also accepted: `{"text": "...", "color": [R,G,B], "dur
 ## Alert System
 
 `AlertManager` in `signage/alert.py`:
+
 - Wraps a `TextRenderer` instance with the alert config
 - `engine.set_alert_manager(mgr)` called at startup
 - `show_frame()` calls `alert_mgr.get_frame()` every frame — composites on top if active
@@ -489,6 +501,7 @@ When an item is playing, the engine kicks off a background thread to pre-render 
 ## Background System (utils.py)
 
 `load_background(width, height, item)` builds and **caches** a PIL Image:
+
 - `bg_mode='color'` → solid fill
 - `bg_mode='corner'` → sample pixel from image corner
 - `bg_mode='image'` → load + resize image, apply dim
@@ -509,6 +522,7 @@ Renderer tries `{code}.png` then `{icon_key}.png`, falls back to built-in geomet
 ## Known Issues & Gotchas
 
 ### Jinja2 limitations
+
 - `tuple()`, `enumerate()` NOT available in templates
 - Use `loop.index0` instead of `enumerate()`
 - Use `| rgb_hex` filter instead of `'%02x%02x%02x' % tuple(color)`
@@ -516,11 +530,13 @@ Renderer tries `{code}.png` then `{icon_key}.png`, falls back to built-in geomet
 - Run `jinja2.Environment().get_template()` locally to catch syntax errors before deploy
 
 ### Checkbox POST collection
+
 HTML checkboxes only submit when checked — `getlist('name')` returns sparse list.
 **Fix**: emit a hidden sentinel field `<input type="hidden" name="foo_sentinel" value="0">` before each checkbox. Collect sentinels to get line count, pair with checkbox values positionally.
 
 ### Template block structure
-```
+
+```jinja2
 {% extends 'base.html' %}
 {% block title %}...{% endblock %}
 {% block head %}...{% endblock %}      ← optional
@@ -531,26 +547,32 @@ HTML checkboxes only submit when checked — `getlist('name')` returns sparse li
 ...
 {% endblock %}
 ```
+
 Each block name must appear **exactly once** in a template. Duplicate block = TemplateAssertionError.
 
 ### Screen test exclusivity
+
 `pause_for_test()` sets `_test_mode` Event and calls `_skip_event.set()` to interrupt the running renderer.
 Engine idles in a `while _test_mode.is_set()` loop.
 `show_frame()` drops calls without `_from_test=True` while test mode is active.
 `resume_playlist()` clears test mode and calls `_skip_event.set()` to restart.
 
 ### thread_type for PyAV
+
 `stream.thread_type = 'AUTO'` **must** be set immediately after opening the stream, before any `seek()` or `demux()` call — those open the codec and the attribute becomes read-only.
 Set it in `VideoRenderer._open()` right after `self._container.streams.video[0]`.
 
 ### numpy truth value
+
 `if self._first is None:` — NOT `if not self._first:` (numpy arrays raise ValueError for bool).
 
 ### MJPEG preview
+
 Changing `src` on existing `<img>` doesn't reliably reconnect MJPEG in all browsers.
 Must remove + recreate the `<img>` element to force new TCP connection.
 
 ### Font search order
+
 ```python
 FONT_SEARCH = [
     '/opt/PixelCast/led-signage/fonts/',
@@ -559,9 +581,11 @@ FONT_SEARCH = [
     '/usr/share/fonts/truetype/',
 ]
 ```
+
 Available fonts: FreeSans, FreeSansBold, FreeMono, FreeSerif, DejaVuSans, DejaVuSans-Bold, DejaVuSansMono
 
 ### colors in JSON
+
 Always `[R, G, B]` lists (0–255). `parse_color()` in `utils.py` handles lists, tuples, `"#rrggbb"` strings, and ints.
 
 ---
@@ -580,6 +604,7 @@ sudo python3 /opt/PixelCast/led-signage/daemon.py
 ```
 
 **Before packaging, always:**
+
 1. `python3 -m py_compile signage/renderer/text.py` etc on all changed .py files
 2. Check template blocks: `grep -c "block\|endblock" template.html`
 3. Verify Jinja2: `python3 -c "from jinja2 import Environment, FileSystemLoader; Environment(loader=FileSystemLoader('signage/web/templates')).get_template('settings.html')"`

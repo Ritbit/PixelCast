@@ -1,6 +1,7 @@
 # LED Signage — Quick Reference Cheatsheet
 
 ## Deployment
+
 ```bash
 ./deploy.sh          # from repo root — overlay-aware, stops/starts service
 journalctl -u PixelCast -f
@@ -9,6 +10,7 @@ journalctl -u PixelCast -f
 **Important:** The systemd service requires `SIGNAGE_SECRET` environment variable for Flask session security. This is auto-generated during installation, or set manually in `/etc/systemd/system/PixelCast.service`.
 
 ## Key Paths
+
 | What             | Path                                               |
 |------------------|----------------------------------------------------|
 | Application code | `/opt/PixelCast/led-signage/`                      |
@@ -25,6 +27,7 @@ journalctl -u PixelCast -f
 **Note:** Config and media are at `/opt/PixelCast` level (persistent), code is in `/opt/PixelCast/led-signage` (replaceable).
 
 ## Display
+
 - Resolution: **256×128** px
 - Frame format: `numpy (128, 256, 3) uint8 RGB`
 - `show_frame()` submits frame to `_OutputThread` (non-blocking) — never blocks on GPIO
@@ -35,12 +38,14 @@ journalctl -u PixelCast -f
 - Brightness: 0–100 (stored in panel.json, applied at matrix init)
 
 ## Remote Log Forwarding
+
 - Auto-discovers a log server on the LAN advertising `_pixelcast-log._tcp` via mDNS — no hostname hardcoded on-device
 - `deployment/scripts/discover-logserver.sh` + `PixelCast-logdiscovery.timer` (runs at boot + every 5min)
 - Status: `GET /system/logs/forward-status` or the indicator on the web UI's Logs page
 - Log server setup: see `deployment/logserver/README.md` (or `install-logserver.sh` for RHEL-based hosts)
 
 ## Adding a New Renderer
+
 1. Create `signage/renderer/mytype.py` extending `BaseRenderer`
 2. Implement `first_frame() → ndarray`, `frames() → generator`, `close()`
 3. Add to `signage/renderer/__init__.py` `get_renderer()` factory
@@ -49,6 +54,7 @@ journalctl -u PixelCast -f
 6. Add to `STATIC_TYPES` in matrix.py if it has a stable first frame
 
 ## Adding a New Route
+
 ```python
 @blueprint.route('/path', methods=['GET','POST'])
 @login_required
@@ -58,12 +64,15 @@ def my_view():
 ```
 
 ## Playlist Item — Required Fields
+
 ```json
 {"id": "uuid4", "type": "text", "name": "...", "duration": 10}
 ```
+
 All other fields are optional with renderer defaults.
 
 ## Text Line — Full Schema
+
 ```json
 {
   "text": "Hello",
@@ -82,19 +91,23 @@ All other fields are optional with renderer defaults.
 ```
 
 ## Scroll Directions
+
 `"left"` `"right"` `"up"` `"down"` `false`
 Speed is px/frame (float, e.g. `0.5` = very slow).
 `loop_count: 0` = infinite, `1` = once then freeze, `N` = N passes.
 
 ## Auto Duration
+
 ```json
 {"duration": "auto"}
 ```
+
 Renderer must set `self._done = True` when content complete.
 0.15s grace period after `_done` before engine advances.
 
 ## Inline Text Codes
-```
+
+```text
 §Cff0000;   → red
 §FFreeSansBold.ttf;  → bold font
 §S28;       → 28px size
@@ -102,12 +115,14 @@ Renderer must set `self._done = True` when content complete.
 ```
 
 ## LED Pixel Rendering
+
 - Auto: font_size ≤ 16px
 - Manual: `"pixel_font": true`
 - Threshold: grey > 32/255 = on, else off
 - DejaVuSans auto-selected at ≤16px (better hinting than FreeSans)
 
 ## Background Options
+
 ```json
 "bg_mode": "color",   "bg_color": [0, 0, 0]
 "bg_mode": "corner",  "bg_corner": "top-left"
@@ -116,27 +131,31 @@ Renderer must set `self._done = True` when content complete.
 ```
 
 ## Transitions
+
 `fade` `fade_black` `wipe_left/right/up/down` `slide_left/right/up/down`
 `zoom_in/out` `dissolve` `melt` `snow` `spiral` `drop`
 `blinds_h/v` `checkerboard` `pixelate` `none` `random`
 Speed: float 0.1–5.0 (higher = faster)
 
 ## Jinja2 Filters
+
 | Filter | Result |
-|--------|--------|
+| -------- | -------- |
 | `{{ color_list \| rgb_hex }}` | `#rrggbb` string |
 | `{{ path \| basename }}` | filename only |
 | `{{ seconds \| timecode }}` | `mm:ss` string |
 | `{{ secs \| fmt_duration }}` | `Xs` / `M:SS` / `H:MM:SS` |
 
 ## Roles
-```
+
+```text
 viewer  → read-only
 editor  → content + files + alerts + brightness
 admin   → full including users, hardware settings, reboot
 ```
 
 ## API Quick Reference
+
 ```bash
 KEY="your-api-key"
 PI="<pi-ip>"
@@ -171,7 +190,7 @@ curl -H "$H" http://$PI/api/v1/snapshot?scale=4 -o snap.jpg
 ## Gotchas Checklist
 
 | Issue | Fix |
-|---|---|
+| --- | --- |
 | Template won't load | Block count mismatch — count `{% block %}` vs `{% endblock %}` |
 | Checkbox not saving | Need hidden sentinel field before each checkbox |
 | `ValueError: truth value ambiguous` | Use `if x is None:` not `if not x:` for numpy arrays |
@@ -185,6 +204,7 @@ curl -H "$H" http://$PI/api/v1/snapshot?scale=4 -o snap.jpg
 | MJPEG not reconnecting | Remove + recreate `<img>` element — don't just change `src` |
 
 ## Pre-packaging Checklist
+
 ```bash
 # 1. Syntax check all changed .py files
 python3 -m py_compile signage/renderer/text.py  # repeat for each
