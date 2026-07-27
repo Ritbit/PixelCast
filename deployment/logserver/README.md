@@ -34,6 +34,10 @@ will be picked up automatically within ~5 minutes (or immediately on boot).
    copy `pixelcast-log.service` (in this directory) to
    `/etc/avahi/services/pixelcast-log.service` and restart `avahi-daemon`.
 
+4. **Add log rotation** — copy `pixelcast-remote-logrotate.conf` to
+   `/etc/logrotate.d/pixelcast-remote` so the forwarded logs don't grow
+   unbounded (daily rotation, 14 days retention, compressed).
+
 That's it — no PixelCast-side configuration needed. If the log server goes
 away, PixelCast devices stop forwarding and fall back to local-only
 journald logging automatically (visible in the web UI's Logs page and in
