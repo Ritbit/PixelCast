@@ -140,16 +140,23 @@ if [ "$INSTALL_DIR" != "$LIVE_DIR" ]; then
 fi
 
 # ── Update Nginx config on the SD card ───────────────────────────────────────
+# Written to both the SD card (DEPLOY_ROOT, survives reboot) and the live
+# overlay path directly (so the change takes effect immediately — otherwise
+# it would only appear after the next reboot flattens the overlay).
 NGINX_SRC="$INSTALL_DIR/deployment/nginx/pixelcast.conf"
 if [ -f "$NGINX_SRC" ]; then
     mkdir -p "${DEPLOY_ROOT}/etc/nginx/sites-available" \
-             "${DEPLOY_ROOT}/etc/nginx/sites-enabled"
+             "${DEPLOY_ROOT}/etc/nginx/sites-enabled" \
+             /etc/nginx/sites-available /etc/nginx/sites-enabled
     cp "$NGINX_SRC" "${DEPLOY_ROOT}/etc/nginx/sites-available/PixelCast"
+    cp "$NGINX_SRC" /etc/nginx/sites-available/PixelCast
     # Symlink target must be the live path (as seen through the overlay)
     ln -sf /etc/nginx/sites-available/PixelCast \
            "${DEPLOY_ROOT}/etc/nginx/sites-enabled/PixelCast"
+    ln -sf /etc/nginx/sites-available/PixelCast /etc/nginx/sites-enabled/PixelCast
     rm -f "${DEPLOY_ROOT}/etc/nginx/sites-enabled/led-signage" \
-          "${DEPLOY_ROOT}/etc/nginx/sites-enabled/default"
+          "${DEPLOY_ROOT}/etc/nginx/sites-enabled/default" \
+          /etc/nginx/sites-enabled/led-signage /etc/nginx/sites-enabled/default
     echo "✓ Nginx config written to SD card"
 else
     echo "⚠ Nginx config not found — skipping"
@@ -163,6 +170,23 @@ if [ -f "$AVAHI_SRC" ]; then
     echo "✓ Avahi service definition installed"
 else
     echo "⚠ Avahi service definition not found — skipping"
+fi
+
+SSL_SCRIPT_SRC="$INSTALL_DIR/deployment/scripts/generate-ssl-cert.sh"
+SSL_SVC_SRC="$INSTALL_DIR/deployment/systemd/PixelCast-ssl-cert.service"
+SSL_NGINX_OVERRIDE_SRC="$INSTALL_DIR/deployment/systemd/nginx-pixelcast-ssl.override.conf"
+if [ -f "$SSL_SCRIPT_SRC" ] && [ -f "$SSL_SVC_SRC" ]; then
+    chmod +x "$SSL_SCRIPT_SRC"
+    mkdir -p "${DEPLOY_ROOT}/etc/systemd/system/nginx.service.d" /etc/systemd/system/nginx.service.d
+    cp "$SSL_SVC_SRC" "${DEPLOY_ROOT}/etc/systemd/system/PixelCast-ssl-cert.service"
+    cp "$SSL_SVC_SRC" /etc/systemd/system/PixelCast-ssl-cert.service
+    cp "$SSL_NGINX_OVERRIDE_SRC" "${DEPLOY_ROOT}/etc/systemd/system/nginx.service.d/pixelcast-ssl.conf"
+    cp "$SSL_NGINX_OVERRIDE_SRC" /etc/systemd/system/nginx.service.d/pixelcast-ssl.conf
+    systemctl daemon-reload
+    systemctl enable PixelCast-ssl-cert.service >/dev/null 2>&1
+    systemctl start PixelCast-ssl-cert.service && echo "✓ Self-signed TLS certificate ensured"
+else
+    echo "⚠ SSL cert generation script/unit not found — skipping"
 fi
 
 DISCOVERY_SCRIPT_SRC="$INSTALL_DIR/deployment/scripts/discover-logserver.sh"

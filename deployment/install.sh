@@ -251,6 +251,30 @@ else
 fi
 
 # =============================================================================
+step "9c. Enable HTTPS with a self-signed certificate"
+# =============================================================================
+# Generates a self-signed cert (deployment/scripts/generate-ssl-cert.sh) and
+# installs a oneshot systemd service that runs before nginx.service so
+# pixelcast.conf's ssl_certificate paths always resolve. The cert's private
+# material is stored on /media/usb when available so it survives reboots.
+SSL_SCRIPT_SRC="$SIGNAGE_DIR/deployment/scripts/generate-ssl-cert.sh"
+SSL_SVC_SRC="$SIGNAGE_DIR/deployment/systemd/PixelCast-ssl-cert.service"
+SSL_NGINX_OVERRIDE_SRC="$SIGNAGE_DIR/deployment/systemd/nginx-pixelcast-ssl.override.conf"
+
+if [ -f "$SSL_SCRIPT_SRC" ] && [ -f "$SSL_SVC_SRC" ]; then
+    chmod +x "$SSL_SCRIPT_SRC"
+    cp "$SSL_SVC_SRC" /etc/systemd/system/PixelCast-ssl-cert.service
+    mkdir -p /etc/systemd/system/nginx.service.d
+    cp "$SSL_NGINX_OVERRIDE_SRC" /etc/systemd/system/nginx.service.d/pixelcast-ssl.conf
+
+    systemctl daemon-reload
+    systemctl enable --now PixelCast-ssl-cert.service
+    log "Self-signed TLS certificate generated — HTTPS ready on port 443"
+else
+    warn "SSL cert generation files not found — skipping HTTPS setup"
+fi
+
+# =============================================================================
 step "10. SD card protection — overlay filesystem"
 # =============================================================================
 # Configures the root filesystem as read-only with a tmpfs overlay so that

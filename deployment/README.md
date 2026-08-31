@@ -15,13 +15,16 @@ sudo bash deployment/install.sh
 deployment/
 ├── install.sh              # Main installation script
 ├── systemd/
-│   ├── PixelCast.service               # Main daemon systemd unit
-│   └── PixelCast-logdiscovery.service  # mDNS log-server discovery (+ .timer)
+│   ├── PixelCast.service                    # Main daemon systemd unit
+│   ├── PixelCast-logdiscovery.service       # mDNS log-server discovery (+ .timer)
+│   ├── PixelCast-ssl-cert.service           # Ensures self-signed TLS cert exists before nginx starts
+│   └── nginx-pixelcast-ssl.override.conf    # nginx.service drop-in (Requires=PixelCast-ssl-cert.service)
 ├── scripts/
-│   └── discover-logserver.sh           # Log-forwarding discovery logic
+│   ├── discover-logserver.sh               # Log-forwarding discovery logic
+│   └── generate-ssl-cert.sh                # Self-signed TLS cert generation (idempotent)
 ├── logserver/                          # Setup for the remote log server side
 └── nginx/
-    └── pixelcast.conf      # Nginx reverse proxy configuration
+    └── pixelcast.conf      # Nginx reverse proxy configuration (HTTP + HTTPS)
 ```
 
 ## Installation Script
@@ -95,7 +98,8 @@ sudo systemctl restart PixelCast
 
 The `nginx/pixelcast.conf` file provides:
 
-- Reverse proxy from port 80 to Flask (port 5000)
+- Reverse proxy from port 80/443 to Flask (port 5000)
+- HTTPS with a self-signed certificate (port 443, alongside plain HTTP on port 80)
 - WebSocket support for real-time updates
 - Static file serving
 - Proper headers and timeouts
@@ -108,6 +112,37 @@ sudo ln -s /etc/nginx/sites-available/pixelcast /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+### HTTPS / Self-Signed Certificate
+
+`ssl_certificate`/`ssl_certificate_key` in `pixelcast.conf` point at
+`/etc/nginx/ssl/pixelcast.{crt,key}`. These are generated automatically by
+`scripts/generate-ssl-cert.sh`, run by the `PixelCast-ssl-cert.service`
+oneshot unit which is ordered before `nginx.service` via the
+`nginx-pixelcast-ssl.override.conf` drop-in — so the cert always exists by
+the time nginx starts.
+
+- If a USB stick is mounted at `/media/usb`, the cert's private key material
+  is stored at `/media/usb/config/ssl/` so it survives reboots (same
+  fingerprint every time). Without a USB stick it's generated directly into
+  `/etc/nginx/ssl/` and may be regenerated on reboot if the root overlay
+  doesn't persist it — still fine, since it's only used for LAN transport
+  encryption.
+- Browsers will show an "untrusted certificate" warning for `https://` —
+  expected for a self-signed cert. The connection is still encrypted; just
+  click through the warning (or add an exception) once per browser.
+- To install/refresh manually:
+
+  ```bash
+  sudo bash deployment/scripts/generate-ssl-cert.sh
+  sudo cp deployment/systemd/PixelCast-ssl-cert.service /etc/systemd/system/
+  sudo mkdir -p /etc/systemd/system/nginx.service.d
+  sudo cp deployment/systemd/nginx-pixelcast-ssl.override.conf \
+      /etc/systemd/system/nginx.service.d/pixelcast-ssl.conf
+  sudo systemctl daemon-reload
+  sudo systemctl enable --now PixelCast-ssl-cert.service
+  sudo nginx -t && sudo systemctl reload nginx
+  ```
 
 ## Hardware Configuration
 

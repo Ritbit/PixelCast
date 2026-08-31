@@ -1,0 +1,18 @@
+[Unit]
+Description=PixelCast - Ensure self-signed TLS certificate for Nginx exists
+DefaultDependencies=no
+After=local-fs.target
+Before=nginx.service
+Requires=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/opt/PixelCast/led-signage/deployment/scripts/mount-usb.sh
+ExecStart=/bin/bash /opt/PixelCast/led-signage/deployment/scripts/generate-ssl-cert.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ssl-cert
+
+[Install]
+WantedBy=multi-user.target

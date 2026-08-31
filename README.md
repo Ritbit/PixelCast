@@ -69,7 +69,10 @@
    - Configure hardware (disable audio to avoid PWM conflicts)
 
 3. **Access the web interface**:
-   - Open `http://<raspberry-pi-ip>` in your browser
+   - Open `http://<raspberry-pi-ip>` or `https://<raspberry-pi-ip>` in your browser
+   - HTTPS uses a self-signed certificate, so browsers will show a security
+     warning the first time — click through it (or add an exception); the
+     connection is still encrypted. See `deployment/README.md` for details.
    - Default credentials: `admin` / `admin` (change immediately!)
 
 ### Deployment & Updates
