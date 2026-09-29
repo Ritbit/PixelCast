@@ -203,6 +203,15 @@ git pull
 sudo systemctl start PixelCast
 ```
 
+### Updating the base OS
+
+Debian and kernel updates need a different procedure, because install.sh
+(step 10) leaves the SD card read-only behind a tmpfs overlay. A plain
+`sudo apt upgrade` will exhaust the RAM disk, fail with half-configured
+packages, and then discard everything on the next reboot.
+
+See [../docs/OS-UPDATES.md](../docs/OS-UPDATES.md) for the full runbook.
+
 ## Uninstall
 
 ```bash

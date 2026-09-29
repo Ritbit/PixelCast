@@ -40,6 +40,19 @@ Feature list, roadmap, and development notes including:
 - Known issues
 - Future development ideas
 
+### OS-UPDATES.md
+
+Runbook for applying Debian and kernel updates to a device whose SD card is
+protected by the read-only overlay filesystem, including:
+
+- Why a plain `apt upgrade` fails (and why the failure is usually harmless)
+- What is and is not persistent across a reboot
+- Auditing the RAM overlay for unsaved config before rebooting
+- Disabling the overlay, upgrading, installing the RT kernel, re-enabling
+- Recovery if the device will not boot
+
+Read this before touching `apt` on a PixelCast device.
+
 ## Additional Documentation
 
 For specific topics, see:

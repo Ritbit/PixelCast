@@ -88,6 +88,11 @@ This deploys code to `/opt/PixelCast/led-signage` while preserving config and me
 
 See [DEPLOY_INSTRUCTIONS.md](DEPLOY_INSTRUCTIONS.md) for detailed deployment guide.
 
+For Debian and kernel updates on the device itself, see
+[docs/OS-UPDATES.md](docs/OS-UPDATES.md). Do **not** run a plain `apt upgrade`:
+the SD card is protected by a read-only overlay, so the upgrade fills the RAM
+disk, fails, and is then discarded on reboot.
+
 ---
 
 ## Directory Structure
@@ -104,6 +109,7 @@ pixelcast/
 ├── docs/                        # 📚 Documentation
 │   ├── DOCUMENTATION_GUIDE.md   # Code documentation standards
 │   ├── FEATURES.md              # Feature list and roadmap
+│   ├── OS-UPDATES.md            # Debian/kernel updates on overlay-protected devices
 │   └── STRUCTURE.md             # Project structure guide
 │
 ├── deployment/                  # 🚀 Deployment files
