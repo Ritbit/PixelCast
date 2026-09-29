@@ -18,7 +18,7 @@ Updates only replace the `led-signage/` directory, preserving your config and me
 Use the automated deployment script:
 
 ```bash
-cd /Users/bas/Documents/Code/RitBit-led-signage
+cd /Users/bas/Documents/Code/RitBit-PixelCast
 ./deploy.sh
 ```
 
@@ -38,7 +38,7 @@ If you prefer manual deployment:
 
 ```bash
 # 1. Package the application
-cd /Users/bas/Documents/Code/RitBit-led-signage
+cd /Users/bas/Documents/Code/RitBit-PixelCast
 tar -czf led-signage.tar.gz \
   --exclude='__pycache__' \
   --exclude='*.pyc' \
