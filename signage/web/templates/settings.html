@@ -421,28 +421,11 @@
       <div class="section-hdr">ColorLight 5A-75B Settings</div>
       <div class="grid-4" style="margin-bottom:12px;">
         <div class="form-group">
-          <label>Card IP address</label>
-          <input type="text" name="colorlight_ip"
-                 value="{{ panel_cfg.get('colorlight_ip','192.168.0.20') }}"
-                 placeholder="192.168.0.20">
-          <div class="setting-desc">Static IP on the same subnet as the Pi.</div>
-        </div>
-        <div class="form-group">
-          <label>UDP port</label>
-          <input type="number" name="colorlight_port"
-                 value="{{ panel_cfg.get('colorlight_port',7000) }}"
-                 min="1" max="65535">
-          <div class="setting-desc">Default: 7000</div>
-        </div>
-        <div class="form-group">
-          <label>Scan lines</label>
-          <select name="colorlight_scan_lines">
-            {% set cl_scan = panel_cfg.get('colorlight_scan_lines', panel_cfg.get('rows',64)//2) %}
-            {% for v in [16, 32, 64] %}
-            <option value="{{ v }}" {{ 'selected' if cl_scan==v }}>{{ v }}</option>
-            {% endfor %}
-          </select>
-          <div class="setting-desc">rows ÷ 2 for 1/32 scan (32 for 64-row panels)</div>
+          <label>Network interface</label>
+          <input type="text" name="colorlight_iface"
+                 value="{{ panel_cfg.get('colorlight_iface','eth0') }}"
+                 placeholder="eth0">
+          <div class="setting-desc">Pi interface the card is wired to.</div>
         </div>
         <div class="form-group">
           <label>HUB75 ports used</label>
@@ -452,24 +435,38 @@
             <option value="{{ v }}" {{ 'selected' if cl_ports==v }}>{{ v }}</option>
             {% endfor %}
           </select>
-          <div class="setting-desc">Card output ports wired to panels.</div>
+          <div class="setting-desc">Rows are addressed top-to-bottom, port 0 first.</div>
+        </div>
+        <div class="form-group">
+          <label>Pixel colour order</label>
+          <select name="colorlight_color_order">
+            {% set cl_order = panel_cfg.get('colorlight_color_order', 'BGR') %}
+            <option value="BGR" {{ 'selected' if cl_order=='BGR' }}>BGR (confirmed on our panels)</option>
+            <option value="RGB" {{ 'selected' if cl_order=='RGB' }}>RGB</option>
+          </select>
+          <div class="setting-desc">Swap if colours look wrong (e.g. red shows as blue).</div>
         </div>
       </div>
       <div style="background:var(--surface2,#1a1e2e); border:1px solid var(--border);
                   border-radius:6px; padding:10px 12px; font-size:12px;
                   color:var(--muted); line-height:1.6; margin-bottom:12px;">
-        ℹ️ Connect the 5A-75B directly to the Pi's Ethernet port (or a dedicated switch).
-        Assign both devices a static IP on the same subnet —
-        e.g. Pi: 192.168.0.1, card: 192.168.0.20.
-        The daemon sends the full configuration automatically on startup.
+        ℹ️ This is a raw-Ethernet protocol, not IP — the card has no IP address
+        and is addressed by its fixed hardware MAC. Live-tested: simple
+        stacked-port layouts (N ports, each <code>display_height ÷ ports</code>
+        rows, top to bottom) worked without a confirmed prior LEDVISION setup
+        on our card — but that may depend on this card's history/firmware. If
+        rows land on the wrong port, or nothing displays, ColorLight's
+        <strong>LEDVISION</strong> tool may still be needed once to define the
+        receiver layout explicitly. See signage/outputs.py for protocol
+        details and sources.
       </div>
-      <button type="button" id="cl-configure-btn" onclick="configureColorlight()"
+      <button type="button" id="cl-discover-btn" onclick="discoverColorlight()"
               style="margin-bottom:16px; padding:8px 18px;
                      background:var(--accent,#4f8ef7); color:#fff; border:none;
                      border-radius:6px; cursor:pointer; font-size:13px;">
-        ⚡ Configure Card Now
+        🔍 Discover Card
       </button>
-      <div id="cl-configure-result" style="font-size:12px; margin-bottom:16px;"></div>
+      <div id="cl-discover-result" style="font-size:12px; margin-bottom:16px;"></div>
       <hr style="margin-bottom:16px;">
     </div>
 
@@ -728,13 +725,13 @@ function applyBoardPreset(boardType) {
   updateParallelOptions(preset.parallelMax);
 }
 
-function configureColorlight() {
-  const btn    = document.getElementById('cl-configure-btn');
-  const result = document.getElementById('cl-configure-result');
+function discoverColorlight() {
+  const btn    = document.getElementById('cl-discover-btn');
+  const result = document.getElementById('cl-discover-result');
   btn.disabled    = true;
-  btn.textContent = '⏳ Configuring…';
+  btn.textContent = '⏳ Discovering…';
   result.textContent = '';
-  fetch('/settings/configure-colorlight', {
+  fetch('/settings/discover-colorlight', {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrfToken},
   })
@@ -742,8 +739,8 @@ function configureColorlight() {
   .then(data => {
     result.style.color = data.ok ? 'var(--success,#4ade80)' : 'var(--error,#f87171)';
     result.textContent = data.ok
-      ? '✓ Configuration sent to card successfully.'
-      : '✗ Error: ' + (data.error || 'unknown');
+      ? '✓ Card responded: ' + JSON.stringify(data.info)
+      : '✗ ' + (data.error || 'unknown');
   })
   .catch(e => {
     result.style.color = 'var(--error,#f87171)';
@@ -751,7 +748,7 @@ function configureColorlight() {
   })
   .finally(() => {
     btn.disabled    = false;
-    btn.textContent = '⚡ Configure Card Now';
+    btn.textContent = '🔍 Discover Card';
   });
 }
 

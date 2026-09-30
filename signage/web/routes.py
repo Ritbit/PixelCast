@@ -288,10 +288,9 @@ def settings():
                     'show_refresh_rate':   request.form.get('show_refresh_rate') == '1',
                     'beeper_gpio':         int(request.form.get('beeper_gpio') or 0),
                     'output_type':            request.form.get('output_type', 'gpio'),
-                    'colorlight_ip':          request.form.get('colorlight_ip', '192.168.0.20'),
-                    'colorlight_port':        int(request.form.get('colorlight_port', 7000)),
-                    'colorlight_scan_lines':  int(request.form.get('colorlight_scan_lines', 32)),
+                    'colorlight_iface':       request.form.get('colorlight_iface', 'eth0'),
                     'colorlight_ports':       int(request.form.get('colorlight_ports', 2)),
+                    'colorlight_color_order': request.form.get('colorlight_color_order', 'BGR'),
                 }
                 os.makedirs(os.path.dirname(cfg_path), exist_ok=True)
                 with open(cfg_path, 'w') as f:
@@ -316,22 +315,27 @@ def settings():
                            board_presets=BOARD_PRESETS)
 
 
-@main_bp.route('/settings/configure-colorlight', methods=['POST'])
+@main_bp.route('/settings/discover-colorlight', methods=['POST'])
 @login_required
-def configure_colorlight():
+def discover_colorlight():
+    """Diagnostic only: broadcasts a discovery frame and reports the card's
+    reply (firmware version) if any. Does NOT configure the card — panel
+    geometry must already be provisioned via LEDVISION. See signage/outputs.py."""
     from flask import jsonify
     engine = current_app.config['ENGINE']
     if engine.cfg.get('output_type') != 'colorlight':
         return jsonify({'ok': False, 'error': 'Output type is not colorlight'}), 400
     try:
         from signage.outputs import ColorLightOutput
-        if isinstance(engine.output, ColorLightOutput):
-            engine.output.configure()
-        else:
+        if not isinstance(engine.output, ColorLightOutput):
             return jsonify({'ok': False, 'error': 'ColorLight output not active (restart daemon first)'}), 400
-        return jsonify({'ok': True})
+        info = engine.output.discover()
+        if info is None:
+            return jsonify({'ok': False, 'error': 'No reply from card — check cabling, '
+                                                    'interface name, and that the card is powered.'})
+        return jsonify({'ok': True, 'info': info})
     except Exception as e:
-        log.exception('ColorLight configure failed')
+        log.exception('ColorLight discover failed')
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 

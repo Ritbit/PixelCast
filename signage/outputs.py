@@ -25,68 +25,71 @@
 ║              panel.json: "gpio" (default) or "colorlight".                  ║
 ║                                                                              ║
 ║  gpio        → hZeller rpi-rgb-led-matrix via GPIO HAT                      ║
-║  colorlight  → ColorLight 5A-75B receiver card via UDP Ethernet             ║
+║  colorlight  → ColorLight 5A-75B receiver card via raw Ethernet (L2)        ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 ColorLight 5A-75B protocol notes
 ─────────────────────────────────
-All card configuration is sent from the daemon — no Windows software needed.
-Network setup: assign static IPs to both the Pi and the card on the same
-subnet (e.g. 192.168.0.x/24).  Connect directly or via a dedicated switch.
+This is NOT an IP/UDP protocol — the card has no IP address at all. Frames
+are raw Ethernet (Layer 2) addressed to the card's fixed, vendor-hardcoded
+MAC 11:22:33:44:55:66. Byte layout below matches Falcon Player's shipping
+ColorLight output plugin (github.com/FalconChristmas/fpp,
+src/channeloutput/ColorLight-5a-75.{h,cpp}), cross-checked against
+https://hkubota.wordpress.com/2022/01/31/winter-project-colorlight-5a-75b-protocol/
 
-On first startup with output_type=colorlight the daemon sends a configuration
-sequence to the card, then streams frames continuously.
+IMPORTANT — one-time setup still required outside PixelCast: the card's
+internal panel geometry (resolution per HUB75 output port, panel size, scan
+type) must be provisioned ONCE using ColorLight's own LEDVISION tool
+(Windows, or Wine) before this backend will display anything sensible. The
+"receiver layout" packets LEDVISION uses for that are not reliably
+reverse-engineered (FPP's own source marks most of them "????" and does not
+attempt to replicate them), so PixelCast doesn't try either. Once LEDVISION
+has configured the card, that layout is stored on the card itself and
+survives power cycles / reboots — from then on PixelCast only needs to
+stream pixel/brightness/sync frames, same as FPP does.
 
---- Configuration packets (sent once on startup / via UI button) ---
+Every Ethernet frame here has the same 13-byte head:
+  Byte 0-5   : destination MAC — always 11:22:33:44:55:66 (fixed by vendor)
+  Byte 6-11  : source MAC — the Pi's own interface MAC
+  Byte 12    : packet type (see below)
+followed by packet-type-specific data starting at byte 13. (Packet captures
+show bytes 12-13 as an "EtherType" field, but the firmware just reads plain
+bytes at fixed offsets — there's no real EtherType semantics involved.)
 
-Screen-parameters packet (command 0x05):
-  Byte 0    : 0x02  – protocol marker
-  Byte 1    : 0x05  – screen config command
-  Byte 2-3  : display width,  big-endian uint16
-  Byte 4-5  : display height, big-endian uint16
-  Byte 6    : scan lines (rows // 2 for 1/32 scan, e.g. 32 for 64-row panels)
-  Byte 7    : colour depth (24 = RGB888)
-  Byte 8-9  : 0x00 0x00  (reserved)
+Packet types:
+  0x0A  Brightness   — data[0..2]=RGB gain (0-255), data[3]=0xFF
+  0x55  Pixel row    — data[0-1]=row (big-endian, global 0..display_height-1),
+                        data[2-3]=pixel offset within row, data[4-5]=pixel
+                        count in this packet, data[6]=0x08, data[7]=0x88,
+                        data[8:]=RGB888 pixel data. Rows wider than 497px
+                        are split across multiple packets (Ethernet MTU).
+  0x01  Sync/Display — tells the card to swap in the frame just streamed.
+                        Sent once per completed frame.
+  0x07/0x08 Discover/Reply — best-effort diagnostic handshake to find the
+                        card and read back firmware version; not required
+                        for normal operation.
 
-Port-mapping packet (command 0x0B, one per HUB75 output port used):
-  Byte 0    : 0x02
-  Byte 1    : 0x0B  – port mapping command
-  Byte 2    : port index  (0-based)
-  Byte 3-4  : x offset,   big-endian uint16
-  Byte 5-6  : y offset,   big-endian uint16
-  Byte 7-8  : port width, big-endian uint16
-  Byte 9-10 : port height, big-endian uint16
-
---- Frame-data packets (sent each frame, one per display row) ---
-
-  Byte 0    : 0x02  – frame-data marker
-  Byte 1    : 0x06  – row-data command
-  Byte 2-3  : row index, big-endian uint16
-  Byte 4-5  : 0x00 0x00  (reserved)
-  Byte 6…   : RGB888 pixel data for that row  (width × 3 bytes)
-
---- Brightness packet ---
-
-  Byte 0    : 0x02
-  Byte 1    : 0x08  – brightness command
-  Byte 2    : R gain  (0-255)
-  Byte 3    : G gain  (0-255)
-  Byte 4    : B gain  (0-255)
-  Byte 5    : 0x00
-
-Default card IP : 192.168.0.20  (configurable in settings)
-Default UDP port: 7000
+Row numbering is global across the whole canvas (0..display_height-1); the
+card maps row ranges to physical HUB75 output ports based on the per-output
+panel height configured via LEDVISION. For N equally-tall horizontal ports
+(colorlight_ports), configure LEDVISION with N outputs of height
+(display_height // colorlight_ports) each, stacked top to bottom, to match
+this backend's row addressing.
 
 Relevant panel.json keys (ColorLight-specific):
-  colorlight_ip       : card IP          (default 192.168.0.20)
-  colorlight_port     : UDP port         (default 7000)
-  colorlight_scan_lines: scan lines       (default rows//2, e.g. 32)
-  colorlight_ports    : HUB75 ports used (default 2)
+  colorlight_iface       : network interface the card is wired to (default eth0)
+  colorlight_ports       : HUB75 ports used — informational, matches the
+                            LEDVISION receiver layout (default 2)
+  colorlight_color_order : 'RGB' or 'BGR' — panel wiring varies by unit;
+                            confirmed 'BGR' on our P2.5 panels via live test
+                            (matches hkubota's own "BGR for my panel" note).
+                            Default 'BGR'.
 """
 
 import logging
 import socket
 import struct
+import time
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -253,94 +256,155 @@ class GPIOOutput(BaseOutput):
 # ──────────────────────────────────────────────────────────────────────────────
 
 class ColorLightOutput(BaseOutput):
-    """Sends configuration and frames to a ColorLight 5A-75B receiver card over UDP."""
+    """Streams frames to a ColorLight 5A-75B receiver card over raw Ethernet.
 
-    DEFAULT_IP   = '192.168.0.20'
-    DEFAULT_PORT = 7000
+    See the module docstring for the full protocol description. This is a
+    Layer-2 protocol (no IP/UDP) addressed to a fixed vendor MAC — requires
+    root (for AF_PACKET raw sockets) and Linux. The card's panel/port layout
+    must already be provisioned via LEDVISION; this backend only streams.
+    """
+
+    DEST_MAC = bytes.fromhex('112233445566')
+    FALLBACK_SRC_MAC = bytes.fromhex('222233445566')
+
+    TYPE_SYNC             = 0x01
+    SYNC_SIZE             = 112
+    TYPE_DISCOVER         = 0x07
+    DISC_SIZE             = 284
+    TYPE_DISCOVER_REPLY   = 0x08
+    TYPE_BRIGHTNESS       = 0x0A
+    BRIG_SIZE             = 77
+    TYPE_PIXEL            = 0x55
+    MAX_PIXELS_PER_PACKET = 497
+    MAX_BYTES_PER_PACKET  = MAX_PIXELS_PER_PACKET * 3
+
+    SIOCGIFHWADDR = 0x8927
 
     def __init__(self, cfg: dict):
         self.width  = cfg['display_width']
         self.height = cfg['display_height']
-        self.ip     = cfg.get('colorlight_ip',         self.DEFAULT_IP)
-        self.port   = cfg.get('colorlight_port',       self.DEFAULT_PORT)
-        self._scan_lines = cfg.get('colorlight_scan_lines',
-                                   cfg.get('rows', 64) // 2)
+        self.iface  = cfg.get('colorlight_iface', 'eth0')
         self._num_ports  = cfg.get('colorlight_ports', 2)
         self._brightness = max(1, min(100, cfg.get('brightness', 80)))
+        color_order = cfg.get('colorlight_color_order', 'BGR').upper()
+        self._pil_rawmode = 'BGR' if color_order == 'BGR' else 'RGB'
 
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self._row_bytes = self.width * 3
+        self._sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3))
+        self._sock.bind((self.iface, 0))
+        self._src_mac = self._get_iface_mac(self.iface)
 
-        log.info(f"ColorLightOutput: {self.width}×{self.height} "
-                 f"scan_lines={self._scan_lines} ports={self._num_ports} "
-                 f"→ {self.ip}:{self.port}")
-        self.configure()
-
-    # ── configuration ─────────────────────────────────────────────────────────
-
-    def configure(self) -> None:
-        """Send display configuration to the card (screen params + port mapping).
-
-        Safe to call multiple times — the card applies settings immediately.
-        Called automatically on startup; also available via the web UI button.
-        """
-        dest = (self.ip, self.port)
-
-        # Screen-parameters packet — tells the card the total display size and
-        # scan configuration.
-        screen_pkt = struct.pack('>BB HH BBBB',
-            0x02, 0x05,
-            self.width, self.height,
-            self._scan_lines, 24, 0x00, 0x00)
-        self._sock.sendto(screen_pkt, dest)
-        log.info(f"ColorLight: sent screen config "
-                 f"{self.width}×{self.height} scan={self._scan_lines}")
-
-        # Port-mapping packets — one per HUB75 output port used.
-        # Each port drives a horizontal strip: full width, height/num_ports tall.
-        # For a 256×128 display with 2 ports:
-        #   Port 0 → x=0, y=0,  w=256, h=64   (top 2 panels)
-        #   Port 1 → x=0, y=64, w=256, h=64   (bottom 2 panels)
         port_h = self.height // self._num_ports
-        for i in range(self._num_ports):
-            port_pkt = struct.pack('>BB B HH HH',
-                0x02, 0x0B,
-                i,
-                0, i * port_h,
-                self.width, port_h)
-            self._sock.sendto(port_pkt, dest)
-            log.info(f"ColorLight: port {i} → "
-                     f"x=0 y={i*port_h} {self.width}×{port_h}")
-
+        log.info(f"ColorLightOutput: {self.width}x{self.height} "
+                 f"({self._num_ports} ports x {port_h}px tall) raw-Ethernet "
+                 f"on {self.iface} -> {self.DEST_MAC.hex(':')} "
+                 f"(card must already be provisioned via LEDVISION)")
         self._send_brightness(self._brightness)
 
-    # ── protocol helpers ──────────────────────────────────────────────────────
+    # ── helpers ──────────────────────────────────────────────────────────────
+
+    def _get_iface_mac(self, iface: str) -> bytes:
+        """Read the Pi's own interface MAC to use as the frame source address."""
+        try:
+            import fcntl
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                info = fcntl.ioctl(s.fileno(), self.SIOCGIFHWADDR,
+                                    struct.pack('256s', iface[:15].encode()))
+            finally:
+                s.close()
+            return info[18:24]
+        except (OSError, ImportError) as e:
+            log.warning(f"ColorLightOutput: could not read MAC of {iface}, "
+                        f"using fallback source MAC ({e})")
+            return self.FALLBACK_SRC_MAC
+
+    def _build(self, packet_type: int, data: bytes, min_size: int = 0) -> bytes:
+        """dst(6) + src(6) + type(1) + data — see module docstring for layout."""
+        frame = bytearray(13 + len(data))
+        frame[0:6]  = self.DEST_MAC
+        frame[6:12] = self._src_mac
+        frame[12]   = packet_type
+        frame[13:]  = data
+        if len(frame) < min_size:
+            frame.extend(b'\x00' * (min_size - len(frame)))
+        return bytes(frame)
 
     def _send_brightness(self, pct: int) -> None:
-        gain = int(pct / 100 * 255)
-        pkt  = bytes([0x02, 0x08, gain, gain, gain, 0x00])
-        self._sock.sendto(pkt, (self.ip, self.port))
+        gain = int(round(pct / 100 * 255))
+        data = bytes([gain, gain, gain, 0xFF])
+        self._sock.send(self._build(self.TYPE_BRIGHTNESS, data, self.BRIG_SIZE))
 
-    def _row_packet(self, row: int, row_data: bytes) -> bytes:
-        return struct.pack('>BBHH', 0x02, 0x06, row, 0) + row_data
+    def _send_sync(self) -> None:
+        """Display/sync frame — tells the card to swap in the frame just streamed."""
+        data = bytearray(28)
+        data[0] = 0x07
+        b = int(round(self._brightness / 100 * 255))
+        data[22], data[23] = b, 0x05
+        data[25], data[26], data[27] = b, b, b
+        self._sock.send(self._build(self.TYPE_SYNC, bytes(data), self.SYNC_SIZE))
+
+    def discover(self, timeout: float = 1.0):
+        """Broadcast a discovery frame and wait for the card's reply.
+
+        Diagnostic only — not required for normal operation. Field offsets
+        come from community reverse-engineering and may not be exact on
+        every firmware version. Returns a dict on success, None on timeout.
+        """
+        req = self._build(self.TYPE_DISCOVER, bytes(self.DISC_SIZE - 13), self.DISC_SIZE)
+        self._sock.settimeout(timeout)
+        try:
+            self._sock.send(req)
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                frame = self._sock.recv(2048)
+                if len(frame) >= 17 and frame[12] == self.TYPE_DISCOVER_REPLY:
+                    return {
+                        'model_byte':     frame[13],
+                        'firmware_major': frame[15],
+                        'firmware_minor': frame[16],
+                    }
+        except socket.timeout:
+            pass
+        finally:
+            self._sock.settimeout(None)
+        return None
 
     # ── BaseOutput API ────────────────────────────────────────────────────────
 
     def send_frame(self, image: Image.Image) -> None:
-        raw  = image.convert('RGB').tobytes()
-        rb   = self._row_bytes
-        send = self._sock.sendto
-        dest = (self.ip, self.port)
+        # Panel wiring determines byte order on the wire — confirmed BGR on
+        # our hardware via live test (see colorlight_color_order above).
+        raw = image.convert('RGB').tobytes('raw', self._pil_rawmode)
+        row_bytes = self.width * 3
+        send, build, max_bytes = self._sock.send, self._build, self.MAX_BYTES_PER_PACKET
+
         for row in range(self.height):
-            send(self._row_packet(row, raw[row * rb : (row + 1) * rb]), dest)
+            row_data = raw[row * row_bytes: (row + 1) * row_bytes]
+            offset = 0
+            while offset < row_bytes:
+                chunk = row_data[offset: offset + max_bytes]
+                pixel_offset    = offset // 3
+                pixels_in_chunk = len(chunk) // 3
+                header = bytes([
+                    (row >> 8) & 0xFF, row & 0xFF,
+                    (pixel_offset >> 8) & 0xFF, pixel_offset & 0xFF,
+                    (pixels_in_chunk >> 8) & 0xFF, pixels_in_chunk & 0xFF,
+                    0x08, 0x88,
+                ])
+                send(build(self.TYPE_PIXEL, header + chunk))
+                offset += len(chunk)
+
+        self._send_sync()
 
     def set_brightness(self, pct: int) -> None:
         self._brightness = max(1, min(100, pct))
         self._send_brightness(self._brightness)
 
     def close(self) -> None:
-        self.clear()
+        try:
+            self.clear()
+        except OSError:
+            pass
         self._sock.close()
 
 
@@ -354,13 +418,20 @@ def create_output(cfg: dict) -> BaseOutput:
 
     output_type values:
         'gpio'        – GPIO HAT via rpi-rgb-led-matrix  (default)
-        'colorlight'  – ColorLight 5A-75B receiver card via UDP
+        'colorlight'  – ColorLight 5A-75B receiver card via raw Ethernet
     """
     output_type = cfg.get('output_type', 'gpio')
 
     if output_type == 'colorlight':
-        log.info("Output backend: ColorLight 5A-75B (UDP Ethernet)")
-        return ColorLightOutput(cfg)
+        try:
+            log.info("Output backend: ColorLight 5A-75B (raw Ethernet)")
+            return ColorLightOutput(cfg)
+        except (OSError, AttributeError) as e:
+            # AF_PACKET raw sockets are Linux-only and need root — falls
+            # back cleanly on dev machines / missing permissions.
+            log.warning(f"ColorLight raw socket unavailable ({e}) — "
+                        f"falling back to StubOutput")
+            return StubOutput(cfg['display_width'], cfg['display_height'])
 
     if output_type == 'gpio':
         try:
