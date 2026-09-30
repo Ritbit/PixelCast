@@ -260,6 +260,9 @@ def settings():
             import json as _json
             cfg_path = current_app.config.get('CONFIG_PATH', 'config/panel.json')
             try:
+                pwm_lsb_nanoseconds = int(request.form.get('pwm_lsb_nanoseconds', 50))
+                if not 20 <= pwm_lsb_nanoseconds <= 3000:
+                    raise ValueError('PWM LSB nanoseconds must be between 20 and 3000')
                 new_cfg = {
                     'board_type':          request.form.get('board_type', 'electrodragon-rpi4'),
                     'gpio_mapping':        request.form.get('gpio_mapping', 'regular'),
@@ -269,7 +272,7 @@ def settings():
                     'parallel':            int(request.form.get('parallel', 2)),
                     'slowdown_gpio':       int(request.form.get('slowdown_gpio', 4)),
                     'pwm_bits':            int(request.form.get('pwm_bits', 7)),
-                    'pwm_lsb_nanoseconds': int(request.form.get('pwm_lsb_nanoseconds', 50)),
+                    'pwm_lsb_nanoseconds': pwm_lsb_nanoseconds,
                     'pwm_dither_bits':     int(request.form.get('pwm_dither_bits', 1)),
                     'display_width':       int(request.form.get('display_width', 256)),
                     'display_height':      int(request.form.get('display_height', 128)),

@@ -131,7 +131,10 @@ class _OutputThread(threading.Thread):
             pass   # output thread just grabbed it — that's fine
 
     def stop(self):
+        """Stop the output thread and wait for it to release the canvas."""
         self._stop.set()
+        if threading.current_thread() is not self:
+            self.join(timeout=2.0)
 
     # ── thread body ───────────────────────────────────────────────────────
 
@@ -221,6 +224,7 @@ class MatrixEngine:
         self._stop_event.set()
         self._skip_event.set()
         self._out_thread.stop()
+        self.output.close()
 
     def skip(self):
         self._skip_event.set()

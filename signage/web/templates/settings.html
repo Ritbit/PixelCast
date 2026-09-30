@@ -630,8 +630,8 @@
       <div class="form-group">
         <label>PWM LSB nanoseconds</label>
         <input type="number" name="pwm_lsb_nanoseconds"
-               value="{{ panel_cfg.get('pwm_lsb_nanoseconds',50) }}" min="50" max="1000">
-        <div class="setting-desc">50–300. 50 works well on Pi 4.</div>
+               value="{{ panel_cfg.get('pwm_lsb_nanoseconds',50) }}" min="20" max="1000">
+        <div class="setting-desc">20–1000. Lower values increase refresh rate but may cause ghosting or flicker.</div>
       </div>
       <div class="form-group">
         <label>PWM dither bits</label>

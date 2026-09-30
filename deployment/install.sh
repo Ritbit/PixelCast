@@ -27,6 +27,7 @@ step() { echo -e "\n${YELLOW}>>> $1${NC}"; }
 
 [ "$EUID" -ne 0 ] && fail "Run as root: sudo bash install.sh"
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INSTALL_DIR="/opt/PixelCast"
 MATRIX_DIR="$INSTALL_DIR/rpi-rgb-led-matrix"
 SIGNAGE_DIR="$INSTALL_DIR/led-signage"
@@ -112,6 +113,19 @@ if git -C "$MATRIX_DIR" cat-file -e pr-pi5-fix 2>/dev/null; then
     else
         log "Pi 5 patch already applied"
     fi
+fi
+
+# Local timing patch: upstream currently rejects values below 50 ns. Keep the
+# default at 50 ns, but allow controlled testing down to 20 ns on Pi 4.
+PWM_PATCH="$SCRIPT_DIR/patches/rpi-rgb-led-matrix-pwm-lsb-20ns.patch"
+PWM_SOURCE="$MATRIX_DIR/lib/options-initialize.cc"
+if grep -q 'pwm_lsb_nanoseconds < 50' "$PWM_SOURCE"; then
+    git -C "$MATRIX_DIR" apply "$PWM_PATCH"
+    log "PWM LSB range patched to 20..3000 ns"
+elif grep -q 'pwm_lsb_nanoseconds < 20' "$PWM_SOURCE"; then
+    log "PWM LSB range patch already applied"
+else
+    fail "Unexpected pwm_lsb_nanoseconds validation in $PWM_SOURCE"
 fi
 log "rpi-rgb-led-matrix ready"
 
@@ -281,10 +295,11 @@ step "10. SD card protection — overlay filesystem"
 # normal runtime writes (logs, tmp files) go to RAM and are discarded on
 # reboot.  Application updates are written through the overlay via deploy.sh.
 #
-# Three things are needed that raspi-config alone does NOT do:
+# Four things are needed that raspi-config alone does NOT do:
 #   1. overlayroot=tmpfs in cmdline.txt          (raspi-config does this)
 #   2. /etc/overlayroot.local.conf               (overrides package default)
 #   3. 'overlay' listed in initramfs-tools/modules so modules.dep is correct
+#   4. systemd-remount-fs drop-in so the unit doesn't false-alarm as failed
 
 CMDLINE="/boot/firmware/cmdline.txt"
 [ -f "$CMDLINE" ] || CMDLINE="/boot/cmdline.txt"
@@ -314,7 +329,28 @@ else
     log "overlay module already in /etc/initramfs-tools/modules"
 fi
 
-# Rebuild initramfs with all three changes baked in
+# 4. Stop systemd-remount-fs from reporting a spurious boot failure.
+# overlayroot rewrites /etc/fstab with '/media/root-ro/ / overlay ...', and
+# systemd-remount-fs then tries to remount / from it. overlayfs rejects all
+# reconfiguration ("No changes allowed in reconfigure"), so the unit exits 1
+# and lands in `systemctl --failed` on every boot — despite having no useful
+# work to do (/ is already rw, the SD is intentionally ro at /media/root-ro).
+# Not a mask: with the overlay disabled the unit does real work and exits 0,
+# and SuccessExitStatus then has no effect. See docs/OS-UPDATES.md.
+REMOUNT_DROPIN="/etc/systemd/system/systemd-remount-fs.service.d"
+mkdir -p "$REMOUNT_DROPIN"
+cat > "$REMOUNT_DROPIN/overlayroot.conf" <<'EOF'
+# Installed by deployment/install.sh — see docs/OS-UPDATES.md
+# Under overlayroot, / is an overlay mount and overlayfs refuses remounts:
+#   mount: /: fsconfig() failed: overlay: No changes allowed in reconfigure.
+# The unit has nothing useful to do in overlay mode, so treat exit 1 as success.
+[Service]
+SuccessExitStatus=1
+EOF
+systemctl daemon-reload
+log "systemd-remount-fs drop-in installed (no spurious boot failure)"
+
+# Rebuild initramfs with all the above changes baked in
 update-initramfs -u
 log "Initramfs rebuilt — overlay will activate on next reboot"
 

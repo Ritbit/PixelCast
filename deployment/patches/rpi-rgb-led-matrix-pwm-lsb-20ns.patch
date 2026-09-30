@@ -1,0 +1,10 @@
+diff --git a/lib/options-initialize.cc b/lib/options-initialize.cc
+--- a/lib/options-initialize.cc
++++ b/lib/options-initialize.cc
+@@ -474,4 +474,4 @@ bool RGBMatrixOptionsAreValid(const RGBMatrix::Options &mopts,
+-  if (pwm_lsb_nanoseconds < 50 || pwm_lsb_nanoseconds > 3000) {
+-    err->append("Invalid range of pwm-lsb-nanoseconds (50..3000 allowed).\n");
++  if (pwm_lsb_nanoseconds < 20 || pwm_lsb_nanoseconds > 3000) {
++    err->append("Invalid range of pwm-lsb-nanoseconds (20..3000 allowed).\n");
+     success = false;
+   }
